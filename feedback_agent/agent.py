@@ -606,6 +606,6 @@ class FeedbackSystem:
 
 
 # Create default instance for ADK web
-# This exposes the app for use with 'adk web' command
+# This exposes the agent pipeline for use with 'adk web' command
 _default_system = FeedbackSystem()
-root_agent = _default_system.app
+root_agent = _default_system.pipeline
