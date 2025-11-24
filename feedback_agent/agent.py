@@ -14,10 +14,18 @@ Key Improvements:
 import uuid
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Any, Dict, Optional, List
+from dotenv import load_dotenv
 
 from google.adk.agents import Agent
 from google.adk.agents.sequential_agent import SequentialAgent
+
+# Load environment variables from .env file for ADK web
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService, InMemorySessionService
@@ -593,3 +601,11 @@ class FeedbackSystem:
         return self.memory.get_mastery_progress(student_id)
 
 
+
+
+
+
+# Create default instance for ADK web
+# This exposes the app for use with 'adk web' command
+_default_system = FeedbackSystem()
+root_agent = _default_system.app
