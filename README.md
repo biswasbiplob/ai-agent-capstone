@@ -185,8 +185,12 @@ ai_agent_capstone/
 │   └── plugins.py              # Metrics & logging
 ├── tests/                      # Test suites
 ├── evals/                      # Evaluation framework
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── CAPSTONE_REPORT.md
+│   └── EVALUATION_SUMMARY.md
+├── .adr/                       # Architecture Decision Records
 ├── demo.py                     # Interactive demo
-├── ARCHITECTURE.md             # Technical docs
 └── README.md                   # This file
 ```
 
@@ -230,11 +234,9 @@ ai_agent_capstone/
 
 ## Documentation
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design and architecture
-- **[PROGRESS.md](./PROGRESS.md)** - Development progress and phases
-- **[BUGS.md](./BUGS.md)** - Known issues and resolutions
+- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System design and architecture
+- **[CAPSTONE_REPORT.md](./docs/CAPSTONE_REPORT.md)** - Project report
 - **[.adr/](./.adr/)** - Architecture Decision Records
-- **[CAPSTONE_REPORT.md](./CAPSTONE_REPORT.md)** - Project report
 
 ## How It Works
 
@@ -269,7 +271,7 @@ python evals/run_evaluation.py
 - Analysis Quality: 23% (needs improvement with better models)
 - Recommendation Relevance: 89%
 
-See [EVALUATION_SUMMARY.md](./EVALUATION_SUMMARY.md) for detailed results.
+See [EVALUATION_SUMMARY.md](./docs/EVALUATION_SUMMARY.md) for detailed results.
 
 ## Troubleshooting
 
@@ -300,10 +302,10 @@ uv pip install -e .
 
 ## Contributing
 
-This is a capstone project for educational purposes. For issues:
-1. Check [BUGS.md](./BUGS.md) for known issues
-2. Review [PROGRESS.md](./PROGRESS.md) for current status
-3. See [.adr/](./.adr/) for architectural decisions
+This is a capstone project for educational purposes. For detailed technical information:
+1. See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for system design
+2. Review [.adr/](./.adr/) for architectural decisions
+3. Check [CAPSTONE_REPORT.md](./docs/CAPSTONE_REPORT.md) for project overview
 
 ## Course Alignment
 
