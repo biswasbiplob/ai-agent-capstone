@@ -37,8 +37,8 @@ async def test_observability():
 
     # Initialize system with metrics
     system = FeedbackSystem(
-        db_path="test_observability.db",
-        session_db_url="sqlite:///test_observability_sessions.db",
+        db_path="data/test_observability.db",
+        session_db_url="sqlite:///data/test_observability_sessions.db",
         use_memory_sessions=False,
         enable_metrics=True,
         metrics_file=test_metrics_file
@@ -177,7 +177,7 @@ async def test_observability():
 
     # Cleanup
     print("\n🧹 Cleaning up test files...")
-    for file in ["test_observability.db", "test_observability_sessions.db", test_metrics_file]:
+    for file in ["data/test_observability.db", "data/test_observability_sessions.db", test_metrics_file]:
         if os.path.exists(file):
             os.remove(file)
             print(f"   ✓ Removed {file}")

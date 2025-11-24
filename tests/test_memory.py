@@ -32,8 +32,8 @@ async def test_memory_service():
     print_section("🧠 Testing Memory Service - Cross-Session Tracking")
 
     # Setup test databases
-    test_db = "test_memory.db"
-    test_session_db = "sqlite:///test_memory_sessions.db"
+    test_db = "data/test_memory.db"
+    test_session_db = "sqlite:///data/test_memory_sessions.db"
 
     # Clean up old test databases
     if os.path.exists(test_db):

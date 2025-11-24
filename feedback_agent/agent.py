@@ -68,8 +68,8 @@ class FeedbackSystem:
 
     def __init__(
         self,
-        db_path: str = "students.db",
-        session_db_url: str = "sqlite:///feedback_sessions.db",
+        db_path: str = "data/students.db",
+        session_db_url: str = "sqlite:///data/feedback_sessions.db",
         use_memory_sessions: bool = False,
         enable_metrics: bool = True,
         metrics_file: str = "exam_metrics.jsonl",

@@ -5,7 +5,7 @@ from feedback_agent.agent import FeedbackSystem
 @pytest.fixture
 def system():
     # Use a temporary db for testing
-    db_path = "test_students.db"
+    db_path = "data/test_students.db"
     if os.path.exists(db_path):
         os.remove(db_path)
     

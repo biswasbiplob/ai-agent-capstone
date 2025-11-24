@@ -262,7 +262,7 @@ async def main():
 
     # Step 2: Setup database
     print("\n📝 Step 2: Setting up database...")
-    db = StudentDatabase("test_auth.db")
+    db = StudentDatabase("data/test_auth.db")
     set_database(db)
     await setup_test_data(db, demo_user_ids)
 

@@ -56,8 +56,8 @@ async def demo_basic_exam_processing():
     # Initialize system
     print("🔧 Initializing FeedbackSystem...")
     system = FeedbackSystem(
-        db_path="demo.db",
-        session_db_url="sqlite:///demo_sessions.db",
+        db_path="data/demo.db",
+        session_db_url="sqlite:///data/demo_sessions.db",
         enable_metrics=True,
         metrics_file="demo_metrics.jsonl"
     )
@@ -134,7 +134,7 @@ async def demo_role_based_access():
     # Initialize database
     from feedback_agent.database import StudentDatabase
 
-    db = StudentDatabase("demo.db")
+    db = StudentDatabase("data/demo.db")
 
     # Configure authorization tools with database
     set_database(db)
@@ -252,8 +252,8 @@ async def demo_metrics_tracking():
 
     print("📊 Creating system with metrics enabled...")
     system = FeedbackSystem(
-        db_path="demo.db",
-        session_db_url="sqlite:///demo_sessions.db",
+        db_path="data/demo.db",
+        session_db_url="sqlite:///data/demo_sessions.db",
         enable_metrics=True,
         metrics_file="demo_metrics.jsonl"
     )
@@ -310,8 +310,8 @@ async def demo_complete_workflow():
     # 1. System initialization
     print("1️⃣  Initialize system")
     system = FeedbackSystem(
-        db_path="demo_complete.db",
-        session_db_url="sqlite:///demo_complete_sessions.db",
+        db_path="data/demo_complete.db",
+        session_db_url="sqlite:///data/demo_complete_sessions.db",
         enable_metrics=True
     )
     print("   ✅ System ready\n")

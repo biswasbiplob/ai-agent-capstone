@@ -41,7 +41,7 @@ async def test_refactored_system():
 
     # Initialize system with in-memory sessions for testing
     system = FeedbackSystem(
-        db_path="test_students_refactored.db",
+        db_path="data/test_students_refactored.db",
         use_memory_sessions=True  # Use memory for quick testing
     )
 
@@ -132,8 +132,8 @@ async def test_session_persistence():
 
     # Initialize with database sessions
     system = FeedbackSystem(
-        db_path="test_students_refactored.db",
-        session_db_url="sqlite:///test_feedback_sessions.db",
+        db_path="data/test_students_refactored.db",
+        session_db_url="sqlite:///data/test_feedback_sessions.db",
         use_memory_sessions=False  # Use database for persistence test
     )
 
