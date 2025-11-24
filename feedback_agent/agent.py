@@ -605,6 +605,7 @@ class FeedbackSystem:
 
 
 
-# Note: This agent is designed for programmatic use via FeedbackSystem.process_exam()
-# It is not designed as a conversational agent for ADK web interface.
-# Use demo.py for interactive demonstrations instead.
+# Create default instance for ADK web
+# This exposes the agent pipeline for use with 'adk web' command
+_default_system = FeedbackSystem()
+root_agent = _default_system.pipeline
