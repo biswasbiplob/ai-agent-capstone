@@ -14,7 +14,7 @@ Key Improvements:
 import uuid
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from google.adk.agents import Agent
 from google.adk.agents.sequential_agent import SequentialAgent
@@ -31,6 +31,7 @@ from feedback_agent.agents.recommendation_agent import RecommendationAgent
 from feedback_agent.database import StudentDatabase
 from feedback_agent.custom_llm import CustomGemini
 from feedback_agent.plugins import ExamMetricsPlugin
+from feedback_agent.memory import MemoryService
 
 # Configure structured logging
 logging.basicConfig(
@@ -74,6 +75,10 @@ class FeedbackSystemRefactored:
             metrics_file: Path to metrics file (JSONL format)
         """
         self.db = StudentDatabase(db_path)
+
+        # Initialize memory service for cross-session tracking
+        self.memory = MemoryService(self.db)
+        logger.info("🧠 MemoryService initialized for cross-session tracking")
 
         # Create session service (persistent or in-memory)
         if use_memory_sessions:
@@ -512,6 +517,80 @@ class FeedbackSystemRefactored:
             self.metrics_plugin.print_summary()
         else:
             logger.warning("Metrics plugin not enabled")
+
+    # Memory Service Methods
+
+    def get_student_recurring_weaknesses(
+        self,
+        student_id: str,
+        min_occurrences: int = 2
+    ) -> list:
+        """
+        Get recurring weaknesses for a student across exams.
+
+        Args:
+            student_id: The student's unique identifier
+            min_occurrences: Minimum times a weakness must appear
+
+        Returns:
+            List of WeaknessPattern objects
+        """
+        return self.memory.get_recurring_weaknesses(student_id, min_occurrences)
+
+    def get_student_learning_velocity(self, student_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get learning velocity metrics for a student.
+
+        Args:
+            student_id: The student's unique identifier
+
+        Returns:
+            LearningVelocity object with progress metrics, or None if insufficient data
+        """
+        velocity = self.memory.get_learning_velocity(student_id)
+
+        if velocity:
+            # Convert dataclass to dict for easier serialization
+            return {
+                "student_id": velocity.student_id,
+                "total_exams": velocity.total_exams,
+                "average_score": velocity.average_score,
+                "score_trend": velocity.score_trend,
+                "improvement_rate": velocity.improvement_rate,
+                "subjects_mastered": velocity.subjects_mastered,
+                "subjects_struggling": velocity.subjects_struggling
+            }
+
+        return None
+
+    def get_student_review_recommendations(
+        self,
+        student_id: str,
+        max_topics: int = 5
+    ) -> List[Dict[str, str]]:
+        """
+        Get personalized review recommendations for a student.
+
+        Args:
+            student_id: The student's unique identifier
+            max_topics: Maximum number of topics to recommend
+
+        Returns:
+            List of recommended topics with priority and rationale
+        """
+        return self.memory.recommend_review_topics(student_id, max_topics)
+
+    def get_student_mastery_progress(self, student_id: str) -> Dict[str, Dict[str, float]]:
+        """
+        Get mastery progress for each subject.
+
+        Args:
+            student_id: The student's unique identifier
+
+        Returns:
+            Dictionary mapping subjects to mastery metrics
+        """
+        return self.memory.get_mastery_progress(student_id)
 
 
 # Create global instance (for backward compatibility)
