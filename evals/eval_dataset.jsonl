@@ -1,0 +1,2 @@
+{"input": {"text": "Grade this exam for student Alan. Subject: Math. Exam: 1. 2+2=? Answer: 4. 2. 3*3=? Answer: 9. Key: 1. 4, 2. 9."}, "expected_output": {"grading": {"total_score": 2, "max_score": 2}}}
+{"input": {"text": "Grade this exam for student Sarah. Subject: Science. Exam: 1. What is H2O? Answer: Water. 2. What is the sun? Answer: Planet. Key: 1. Water, 2. Star."}, "expected_output": {"grading": {"total_score": 1, "max_score": 2}}}
