@@ -28,9 +28,8 @@ Student submits exam → AI grades it → Identifies weaknesses → Creates pers
 1. **Clone and setup**:
 ```bash
 cd ai_agent_capstone
-uv venv
+uv sync
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
 ```
 
 2. **Configure API Key**:
@@ -296,7 +295,7 @@ MODEL_NAME="gemini-1.5-flash"
 **Solution**: Activate virtual environment and reinstall
 ```bash
 source .venv/bin/activate
-uv pip install -e .
+uv sync
 ```
 
 ### API Key Issues

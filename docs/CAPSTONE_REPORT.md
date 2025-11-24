@@ -587,8 +587,8 @@ This project demonstrates a solid foundation for an AI-powered educational syste
 cd ai_agent_capstone
 
 # Install dependencies
-uv venv && source .venv/bin/activate
-uv pip install -e .
+uv sync
+source .venv/bin/activate
 
 # Configure environment
 cat > feedback_agent/.env << 'EOF'
