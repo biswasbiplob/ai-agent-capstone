@@ -71,11 +71,11 @@ Select from 5 demos:
 
 ```python
 import asyncio
-from feedback_agent.agent_refactored import FeedbackSystemRefactored
+from feedback_agent.agent import FeedbackSystem
 
 async def grade_exam():
     # Initialize system
-    system = FeedbackSystemRefactored()
+    system = FeedbackSystem()
 
     # Register student
     student_id = system.register_student("John Doe")
@@ -158,7 +158,7 @@ Choose the right model for your use case in `feedback_agent/.env`:
 ### Enable Metrics Tracking
 
 ```python
-system = FeedbackSystemRefactored(
+system = FeedbackSystem(
     enable_metrics=True,
     metrics_file="exam_metrics.jsonl"
 )
@@ -177,7 +177,7 @@ ai_agent_capstone/
 │   │   ├── analysis_agent.py
 │   │   ├── recommendation_agent.py
 │   │   └── image_processing_agent.py
-│   ├── agent_refactored.py     # Main system
+│   ├── agent.py                # Main system
 │   ├── auth.py                 # Authentication
 │   ├── authorization.py        # Access control
 │   ├── database.py             # Data persistence

@@ -45,7 +45,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class FeedbackSystemRefactored:
+class FeedbackSystem:
     """
     Refactored feedback system using proper ADK Runner pattern.
 
@@ -593,5 +593,3 @@ class FeedbackSystemRefactored:
         return self.memory.get_mastery_progress(student_id)
 
 
-# Create global instance (for backward compatibility)
-feedback_system_refactored = FeedbackSystemRefactored()

@@ -67,7 +67,7 @@ Exam Input → GradingAgent → AnalysisAgent → RecommendationAgent → Result
 **Core Pattern**: ADK Runner with Sequential Agents
 
 ```python
-FeedbackSystemRefactored
+FeedbackSystem
   ├─ Runner (orchestration)
   │   └─ App
   │       ├─ SequentialAgent pipeline
@@ -615,7 +615,7 @@ python evals/run_evaluation.py
 - Main branch: `main`
 
 **Key Files**:
-- `feedback_agent/agent_refactored.py`: Main system
+- `feedback_agent/agent.py`: Main system
 - `feedback_agent/plugins.py`: Custom metrics plugin
 - `evals/run_evaluation.py`: Evaluation framework
 - `demo.py`: Interactive demonstration

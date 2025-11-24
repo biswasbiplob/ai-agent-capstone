@@ -39,7 +39,7 @@ Example: "F=ma calculation wrong" → "Newton's Laws" → "Force Calculations"
 
 Update AnalysisAgent to receive both graded results AND original exam content:
 
-1. **Update agent_refactored.py pipeline**:
+1. **Update agent.py pipeline**:
    - AnalysisAgent instruction now includes {exam_content} state placeholder
    - Agent can read original exam questions and topics
 
@@ -55,7 +55,7 @@ Update AnalysisAgent to receive both graded results AND original exam content:
 
 ## Implementation
 
-### Changes to agent_refactored.py
+### Changes to agent.py
 
 **Before**:
 ```python

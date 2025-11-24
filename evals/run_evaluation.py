@@ -31,7 +31,7 @@ from evals.metrics import (
     RecommendationRelevanceMetric,
     calculate_overall_score,
 )
-from feedback_agent.agent_refactored import FeedbackSystemRefactored
+from feedback_agent.agent import FeedbackSystem
 
 # Configure logging
 logging.basicConfig(
@@ -64,7 +64,7 @@ class EvaluationRunner:
 
         # Initialize agent system
         logger.info("Initializing feedback agent system...")
-        self.feedback_system = FeedbackSystemRefactored(
+        self.feedback_system = FeedbackSystem(
             db_path=self.db_path,
             use_memory_sessions=True,  # Use in-memory sessions for evaluation
         )

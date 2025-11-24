@@ -16,7 +16,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from feedback_agent.agent_refactored import FeedbackSystemRefactored
+from feedback_agent.agent import FeedbackSystem
 
 
 def print_section(title: str):
@@ -40,8 +40,8 @@ async def test_memory_service():
         os.remove(test_db)
 
     # Initialize system
-    print("🔧 Initializing FeedbackSystemRefactored...")
-    system = FeedbackSystemRefactored(
+    print("🔧 Initializing FeedbackSystem...")
+    system = FeedbackSystem(
         db_path=test_db,
         session_db_url=test_session_db,
         use_memory_sessions=False,

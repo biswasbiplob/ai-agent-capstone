@@ -204,7 +204,7 @@ def run_agent(agent, input_text, session_state=None):
 
 ## Implemented Solution ✅
 
-We've created a **fully refactored implementation** in `feedback_agent/agent_refactored.py` that:
+We've created a **fully refactored implementation** in `feedback_agent/agent.py` that:
 
 ### ✅ Fixes All Critical Issues
 
@@ -244,7 +244,7 @@ We've created a **fully refactored implementation** in `feedback_agent/agent_ref
 run_agent(pipeline, "", session_state=session_state)
 ```
 
-**After** (agent_refactored.py):
+**After** (agent.py):
 ```python
 # Proper ADK pattern
 async for event in self.runner.run_async(
@@ -262,7 +262,7 @@ async for event in self.runner.run_async(
 ## Refactoring Impact
 
 ### Files Created
-- ✅ `feedback_agent/agent_refactored.py` - New implementation
+- ✅ `feedback_agent/agent.py` - New implementation
 - ✅ `test_refactored_agent.py` - Test suite
 - ✅ `.adr/001-migrate-to-adk-runner-pattern.md` - Architecture decision record
 - ✅ `.adr/002-agent-state-flow-pattern.md` - State management documentation
@@ -470,7 +470,7 @@ async for event in self.runner.run_async(
 
 ### For Immediate Action (Before Capstone Submission)
 
-1. ✅ **Use the refactored code** (`agent_refactored.py`)
+1. ✅ **Use the refactored code** (`agent.py`)
 2. ⏰ **Add evaluation framework** (Phase 5) - Critical for demonstrating quality
 3. ⏰ **Fix image processing** (Phase 4) - Critical for demo
 4. ⏰ **Add role-based access** (Phase 2) - Shows understanding of real-world requirements
@@ -522,7 +522,7 @@ To get a strong capstone grade, ensure you demonstrate:
 ---
 
 **Files to Review**:
-- `feedback_agent/agent_refactored.py` - New implementation
+- `feedback_agent/agent.py` - New implementation
 - `.adr/001-migrate-to-adk-runner-pattern.md` - Architecture decisions
 - `.adr/002-agent-state-flow-pattern.md` - State management
 - `PROGRESS.md` - Detailed progress tracking

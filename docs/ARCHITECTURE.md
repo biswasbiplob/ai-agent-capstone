@@ -83,7 +83,7 @@ All I/O operations use async/await:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FeedbackSystemRefactored                  │
+│                    FeedbackSystem                  │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                      Runner                          │   │
 │  │  ┌───────────────────────────────────────────────┐  │   │
@@ -139,9 +139,9 @@ External Systems:
 
 ## Core Components
 
-### 1. FeedbackSystemRefactored
+### 1. FeedbackSystem
 
-**Location**: `feedback_agent/agent_refactored.py`
+**Location**: `feedback_agent/agent.py`
 
 **Responsibilities**:
 - System initialization and configuration
@@ -399,7 +399,7 @@ Based on the weakness analysis: {weakness_analysis}
    ├─ answer_key
    └─ subject
 
-2. FeedbackSystemRefactored.process_exam()
+2. FeedbackSystem.process_exam()
    ├─ Generate exam_id
    ├─ Create session with initial state
    └─ Trigger Runner
@@ -682,7 +682,7 @@ logging.basicConfig(
 **Log Examples**:
 ```
 2025-11-24 18:55:03,307 - feedback_agent.plugins - INFO - 📊 Exam abc123 processed in 5.50s
-2025-11-24 18:55:03,310 - feedback_agent.agent_refactored - INFO - ✅ Exam processing complete for abc123
+2025-11-24 18:55:03,310 - feedback_agent.agent - INFO - ✅ Exam processing complete for abc123
 ```
 
 ---
@@ -718,7 +718,7 @@ logging.basicConfig(
    └─ evals/evalset.json
 
 2. For Each Test Case:
-   ├─ Execute FeedbackSystemRefactored.process_exam()
+   ├─ Execute FeedbackSystem.process_exam()
    ├─ Extract results (scores, weaknesses, recommendations)
    ├─ Compare with ground truth
    │  ├─ GradingAccuracyMetric
@@ -975,7 +975,7 @@ ai_agent_capstone/
 │   │   ├── analysis_agent.py
 │   │   ├── recommendation_agent.py
 │   │   └── image_processing_agent.py
-│   ├── agent_refactored.py        # Main system
+│   ├── agent.py        # Main system
 │   ├── auth.py                    # Authentication
 │   ├── authorization.py           # Authorization tools
 │   ├── database.py                # Data persistence

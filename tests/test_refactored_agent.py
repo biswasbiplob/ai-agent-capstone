@@ -22,7 +22,7 @@ if not os.getenv("GOOGLE_API_KEY"):
 else:
     print(f"✅ API Key loaded successfully")
 
-from feedback_agent.agent_refactored import FeedbackSystemRefactored
+from feedback_agent.agent import FeedbackSystem
 
 # Configure logging
 logging.basicConfig(
@@ -40,7 +40,7 @@ async def test_refactored_system():
     print("=" * 80 + "\n")
 
     # Initialize system with in-memory sessions for testing
-    system = FeedbackSystemRefactored(
+    system = FeedbackSystem(
         db_path="test_students_refactored.db",
         use_memory_sessions=True  # Use memory for quick testing
     )
@@ -131,7 +131,7 @@ async def test_session_persistence():
     print("=" * 80 + "\n")
 
     # Initialize with database sessions
-    system = FeedbackSystemRefactored(
+    system = FeedbackSystem(
         db_path="test_students_refactored.db",
         session_db_url="sqlite:///test_feedback_sessions.db",
         use_memory_sessions=False  # Use database for persistence test

@@ -65,8 +65,8 @@ This involves:
 ### New Architecture (Correct)
 
 ```python
-# feedback_agent/agent_refactored.py
-class FeedbackSystemRefactored:
+# feedback_agent/agent.py
+class FeedbackSystem:
     def __init__(self):
         # 1. Create SessionService
         self.session_service = DatabaseSessionService(db_url="sqlite:///feedback_sessions.db")
@@ -117,7 +117,7 @@ class FeedbackSystemRefactored:
 ### Negative ⚠️
 
 1. **Breaking Change**: Old code (`agent.py`) won't work with new pattern
-2. **Migration Needed**: Existing code must be migrated to `agent_refactored.py`
+2. **Migration Needed**: Existing code must be migrated to `agent.py`
 3. **Learning Curve**: Team must understand Runner/SessionService concepts
 4. **More Files**: Now have both old and new implementations during transition
 
@@ -210,7 +210,7 @@ session = await session_service.create_session(
 
 ## Migration Strategy
 
-1. **Phase 1**: Create `agent_refactored.py` with new pattern (✅ COMPLETE)
+1. **Phase 1**: Create `agent.py` with new pattern (✅ COMPLETE)
 2. **Phase 2**: Test refactored implementation
 3. **Phase 3**: Migrate existing functionality
 4. **Phase 4**: Update tests to use new system
@@ -222,7 +222,7 @@ session = await session_service.create_session(
 - [Kaggle Day 3a: Agent Sessions Notebook](agent_notebooks_example/day-3a-agent-sessions.ipynb)
 - [ADK Documentation: Sessions](https://google.github.io/adk-docs/core/sessions/)
 - [ADK Documentation: Context Compaction](https://google.github.io/adk-docs/context/compaction/)
-- `feedback_agent/agent_refactored.py` - New implementation
+- `feedback_agent/agent.py` - New implementation
 - `test_refactored_agent.py` - Test suite
 
 ## Success Metrics

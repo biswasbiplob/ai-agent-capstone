@@ -13,7 +13,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from feedback_agent.agent_refactored import FeedbackSystemRefactored
+from feedback_agent.agent import FeedbackSystem
 from feedback_agent.auth import AuthenticationService, UserRole
 from feedback_agent.authorization import (
     get_my_performance,
@@ -36,8 +36,8 @@ async def demo_basic_exam_processing():
     print_section("DEMO 1: Basic Exam Processing")
 
     # Initialize system
-    print("🔧 Initializing FeedbackSystemRefactored...")
-    system = FeedbackSystemRefactored(
+    print("🔧 Initializing FeedbackSystem...")
+    system = FeedbackSystem(
         db_path="demo.db",
         session_db_url="sqlite:///demo_sessions.db",
         enable_metrics=True,
@@ -213,7 +213,7 @@ async def demo_metrics_tracking():
     print_section("DEMO 4: Metrics & Observability")
 
     print("📊 Creating system with metrics enabled...")
-    system = FeedbackSystemRefactored(
+    system = FeedbackSystem(
         db_path="demo.db",
         session_db_url="sqlite:///demo_sessions.db",
         enable_metrics=True,
@@ -271,7 +271,7 @@ async def demo_complete_workflow():
 
     # 1. System initialization
     print("1️⃣  Initialize system")
-    system = FeedbackSystemRefactored(
+    system = FeedbackSystem(
         db_path="demo_complete.db",
         session_db_url="sqlite:///demo_complete_sessions.db",
         enable_metrics=True

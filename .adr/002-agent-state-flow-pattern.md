@@ -428,7 +428,7 @@ session = await session_service.create_session(
 - [Kaggle Day 1b: Agent Architectures](agent_notebooks_example/day-1b-agent-architectures.ipynb)
 - [Kaggle Day 5a: Agent-to-Agent Communication](agent_notebooks_example/day-5a-agent2agent-communication.ipynb)
 - [ADK Documentation: State Management](https://google.github.io/adk-docs/core/state/)
-- `feedback_agent/agent_refactored.py` - Implementation
+- `feedback_agent/agent.py` - Implementation
 
 ## Success Metrics
 
