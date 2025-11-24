@@ -6,7 +6,16 @@ free-form text input with the structured exam processing pipeline.
 """
 
 import logging
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
+
+# Load environment variables
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +31,9 @@ def create_root_agent() -> LlmAgent:
     Returns:
         LlmAgent configured for conversational exam processing
     """
+    # Get model from environment or use default
+    model = os.getenv("MODEL_NAME", "gemini-1.5-flash")
+
     system_instruction = """You are an AI assistant for an automated exam correction system.
 
 Your role is to help users understand and use the exam grading system. You can:
@@ -81,7 +93,7 @@ Be helpful and guide users on how to use the system effectively."""
 
     agent = LlmAgent(
         name="conversational_exam_agent",
-        model="gemini-1.5-flash",
+        model=model,
         instruction=system_instruction,
     )
 
