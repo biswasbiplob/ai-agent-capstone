@@ -605,7 +605,7 @@ class FeedbackSystem:
 
 
 
-# Create default instance for ADK web
-# This exposes the agent pipeline for use with 'adk web' command
-_default_system = FeedbackSystem()
-root_agent = _default_system.pipeline
+# Create conversational wrapper for ADK web
+# This exposes a conversational interface that wraps the processing pipeline
+from feedback_agent.conversational_agent import create_root_agent
+root_agent = create_root_agent()

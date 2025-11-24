@@ -58,7 +58,14 @@ Try the interactive demo:
 python demo.py
 ```
 
-Select from 5 demos:
+Or explore the conversational interface:
+```bash
+adk web
+```
+
+**Note**: The `adk web` interface provides guidance on using the system. For actual exam processing, use `demo.py` or the Python API.
+
+**Demo Options** - Select from 5 demos:
 1. Basic Exam Processing - See how grading works
 2. Role-Based Access Control - Student vs Teacher permissions
 3. Image Processing - Upload exam photos
