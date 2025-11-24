@@ -11,15 +11,14 @@ Key Improvements:
 - Proper event streaming and session management
 """
 
-import uuid
 import json
 import logging
 import os
+import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-from dotenv import load_dotenv
+from typing import Any, Dict, List, Optional
 
-from google.adk.agents import Agent
+from dotenv import load_dotenv
 from google.adk.agents.sequential_agent import SequentialAgent
 
 # Load environment variables from .env file for ADK web
@@ -27,28 +26,27 @@ _env_path = Path(__file__).parent / ".env"
 if _env_path.exists():
     load_dotenv(_env_path)
 from google.adk.agents.callback_context import CallbackContext
-from google.adk.runners import Runner
-from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.plugins import LoggingPlugin
+from google.adk.runners import Runner
+from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
 
 from feedback_agent.agents.analysis_agent import AnalysisAgent
 from feedback_agent.agents.grading_agent import GradingAgent
 from feedback_agent.agents.recommendation_agent import RecommendationAgent
 from feedback_agent.database import StudentDatabase
-from feedback_agent.custom_llm import CustomGemini
-from feedback_agent.plugins import ExamMetricsPlugin
 from feedback_agent.memory import MemoryService
+from feedback_agent.plugins import ExamMetricsPlugin
 
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
     handlers=[
         logging.StreamHandler(),  # Console output
-        logging.FileHandler('feedback_system.log', mode='a')  # File output
-    ]
+        logging.FileHandler("feedback_system.log", mode="a"),  # File output
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -70,7 +68,7 @@ class FeedbackSystem:
         session_db_url: str = "sqlite:///feedback_sessions.db",
         use_memory_sessions: bool = False,
         enable_metrics: bool = True,
-        metrics_file: str = "exam_metrics.jsonl"
+        metrics_file: str = "exam_metrics.jsonl",
     ):
         """
         Initialize the feedback system.
@@ -110,8 +108,7 @@ class FeedbackSystem:
         # Add custom metrics plugin if enabled
         if enable_metrics:
             self.metrics_plugin = ExamMetricsPlugin(
-                log_to_file=True,
-                metrics_file=metrics_file
+                log_to_file=True, metrics_file=metrics_file
             )
             self.plugins.append(self.metrics_plugin)
             logger.info(f"📊 ExamMetricsPlugin enabled (logging to {metrics_file})")
@@ -125,15 +122,12 @@ class FeedbackSystem:
             plugins=self.plugins,  # Plugins go in App, not Runner
             events_compaction_config=EventsCompactionConfig(
                 compaction_interval=5,  # Compact after 5 exam processing sessions
-                overlap_size=1  # Keep last exam for context
-            )
+                overlap_size=1,  # Keep last exam for context
+            ),
         )
 
         # Create Runner (without plugins, since they're in App)
-        self.runner = Runner(
-            app=self.app,
-            session_service=self.session_service
-        )
+        self.runner = Runner(app=self.app, session_service=self.session_service)
 
         logger.info("✅ FeedbackSystemRefactored initialized with Runner pattern")
 
@@ -159,7 +153,7 @@ class FeedbackSystem:
         grading_agent.agent.after_agent_callback = self._log_grading_callback
 
         # Update GradingAgent instruction to use state placeholders
-        grading_agent.agent.instruction = '''
+        grading_agent.agent.instruction = """
         You are an expert grader.
 
         Exam content: {exam_content}
@@ -182,14 +176,14 @@ class FeedbackSystem:
             ],
             "general_feedback": <str>
         }}
-        '''
+        """
 
         # Configure AnalysisAgent
         analysis_agent.agent.output_key = "weakness_analysis"
         analysis_agent.agent.after_agent_callback = self._log_analysis_callback
 
         # Update AnalysisAgent instruction to use state placeholders
-        analysis_agent.agent.instruction = '''
+        analysis_agent.agent.instruction = """
         You are an expert educational analyst.
         Your task is to analyze a graded exam and identify the student's weak areas by identifying the CONCEPTS/TOPICS being tested, not the question text.
 
@@ -236,14 +230,16 @@ class FeedbackSystem:
         WRONG topic: "What is the square root of 16?" (don't copy the question!)
 
         Focus on identifying the underlying CONCEPTS the student struggled with, not repeating the question text.
-        '''
+        """
 
         # Configure RecommendationAgent
         recommendation_agent.agent.output_key = "learning_plan"
-        recommendation_agent.agent.after_agent_callback = self._log_recommendation_callback
+        recommendation_agent.agent.after_agent_callback = (
+            self._log_recommendation_callback
+        )
 
         # Update RecommendationAgent instruction to use state placeholders
-        recommendation_agent.agent.instruction = '''
+        recommendation_agent.agent.instruction = """
         You are a learning advisor.
 
         Based on the weakness analysis: {weakness_analysis}
@@ -261,7 +257,7 @@ class FeedbackSystem:
             ],
             "encouragement": <str>
         }}
-        '''
+        """
 
         # Create Sequential Pipeline
         pipeline = SequentialAgent(
@@ -269,8 +265,8 @@ class FeedbackSystem:
             sub_agents=[
                 grading_agent.agent,
                 analysis_agent.agent,
-                recommendation_agent.agent
-            ]
+                recommendation_agent.agent,
+            ],
         )
 
         return pipeline
@@ -299,7 +295,7 @@ class FeedbackSystem:
             subject = callback_context.state.get("subject", "Unknown Subject")
 
             if not exam_id or not student_id:
-                logger.error(f"Missing exam_id or student_id in state")
+                logger.error("Missing exam_id or student_id in state")
                 return
 
             # Save to database
@@ -309,7 +305,7 @@ class FeedbackSystem:
                 student_id=student_id,
                 subject=subject,
                 total_score=grading_result.get("total_score", 0),
-                max_score=grading_result.get("max_score", 0)
+                max_score=grading_result.get("max_score", 0),
             )
 
         except json.JSONDecodeError as e:
@@ -344,8 +340,7 @@ class FeedbackSystem:
             # Save to database
             logger.info(f"Logging analysis result for exam {exam_id}")
             self.db.log_analysis(
-                exam_id=exam_id,
-                weaknesses=analysis_result.get("weaknesses", [])
+                exam_id=exam_id, weaknesses=analysis_result.get("weaknesses", [])
             )
 
         except json.JSONDecodeError as e:
@@ -353,7 +348,9 @@ class FeedbackSystem:
         except Exception as e:
             logger.error(f"Error in analysis callback: {e}", exc_info=True)
 
-    async def _log_recommendation_callback(self, callback_context: CallbackContext) -> None:
+    async def _log_recommendation_callback(
+        self, callback_context: CallbackContext
+    ) -> None:
         """
         Async callback to log recommendations to database.
 
@@ -380,8 +377,7 @@ class FeedbackSystem:
             # Save to database
             logger.info(f"Logging recommendation result for exam {exam_id}")
             self.db.log_analysis(
-                exam_id=exam_id,
-                recommendations=json.dumps(recommendation_result)
+                exam_id=exam_id, recommendations=json.dumps(recommendation_result)
             )
 
         except json.JSONDecodeError as e:
@@ -402,7 +398,7 @@ class FeedbackSystem:
         exam_content: str,
         answer_key: str,
         subject: str = "Unknown Subject",
-        user_id: str = "default_user"
+        user_id: str = "default_user",
     ) -> Dict[str, Any]:
         """
         Process an exam using the proper Runner pattern.
@@ -431,7 +427,7 @@ class FeedbackSystem:
             "student_id": student_id,
             "subject": subject,
             "exam_content": exam_content,
-            "answer_key": answer_key
+            "answer_key": answer_key,
         }
 
         # Create or get session with initial state
@@ -439,14 +435,13 @@ class FeedbackSystem:
             app_name=self.app.name,
             user_id=user_id,
             session_id=session_id,
-            state=initial_state
+            state=initial_state,
         )
 
         # Create a trigger message for the pipeline
         # The message itself is empty because data is in state
         trigger_message = types.Content(
-            role="user",
-            parts=[types.Part(text="Process this exam.")]
+            role="user", parts=[types.Part(text="Process this exam.")]
         )
 
         # Run the pipeline through the Runner
@@ -454,9 +449,7 @@ class FeedbackSystem:
 
         response_parts = []
         async for event in self.runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=trigger_message
+            user_id=user_id, session_id=session_id, new_message=trigger_message
         ):
             # Collect response parts
             if event.content and event.content.parts:
@@ -466,9 +459,7 @@ class FeedbackSystem:
 
         # Retrieve final session state
         final_session = await self.session_service.get_session(
-            app_name=self.app.name,
-            user_id=user_id,
-            session_id=session_id
+            app_name=self.app.name, user_id=user_id, session_id=session_id
         )
 
         # Fetch from database which has the proper format
@@ -481,11 +472,17 @@ class FeedbackSystem:
                 "student_id": student_id,
                 "subject": subject,
                 # Flatten structure for easy access
-                "total_score": db_result['grading']['total_score'],
-                "max_score": db_result['grading']['max_score'],
-                "percentage": (db_result['grading']['total_score'] / db_result['grading']['max_score'] * 100) if db_result['grading']['max_score'] > 0 else 0,
-                "weaknesses": db_result['analysis']['weaknesses'],
-                "recommendations": db_result['analysis']['recommendations']
+                "total_score": db_result["grading"]["total_score"],
+                "max_score": db_result["grading"]["max_score"],
+                "percentage": (
+                    db_result["grading"]["total_score"]
+                    / db_result["grading"]["max_score"]
+                    * 100
+                )
+                if db_result["grading"]["max_score"] > 0
+                else 0,
+                "weaknesses": db_result["analysis"]["weaknesses"],
+                "recommendations": db_result["analysis"]["recommendations"],
             }
             logger.info(f"✅ Exam processing complete for {exam_id}")
         else:
@@ -499,7 +496,7 @@ class FeedbackSystem:
                 "max_score": 0,
                 "percentage": 0.0,
                 "weaknesses": [],
-                "recommendations": ""
+                "recommendations": "",
             }
 
         return results
@@ -529,9 +526,7 @@ class FeedbackSystem:
     # Memory Service Methods
 
     def get_student_recurring_weaknesses(
-        self,
-        student_id: str,
-        min_occurrences: int = 2
+        self, student_id: str, min_occurrences: int = 2
     ) -> list:
         """
         Get recurring weaknesses for a student across exams.
@@ -545,7 +540,9 @@ class FeedbackSystem:
         """
         return self.memory.get_recurring_weaknesses(student_id, min_occurrences)
 
-    def get_student_learning_velocity(self, student_id: str) -> Optional[Dict[str, Any]]:
+    def get_student_learning_velocity(
+        self, student_id: str
+    ) -> Optional[Dict[str, Any]]:
         """
         Get learning velocity metrics for a student.
 
@@ -566,15 +563,13 @@ class FeedbackSystem:
                 "score_trend": velocity.score_trend,
                 "improvement_rate": velocity.improvement_rate,
                 "subjects_mastered": velocity.subjects_mastered,
-                "subjects_struggling": velocity.subjects_struggling
+                "subjects_struggling": velocity.subjects_struggling,
             }
 
         return None
 
     def get_student_review_recommendations(
-        self,
-        student_id: str,
-        max_topics: int = 5
+        self, student_id: str, max_topics: int = 5
     ) -> List[Dict[str, str]]:
         """
         Get personalized review recommendations for a student.
@@ -588,7 +583,9 @@ class FeedbackSystem:
         """
         return self.memory.recommend_review_topics(student_id, max_topics)
 
-    def get_student_mastery_progress(self, student_id: str) -> Dict[str, Dict[str, float]]:
+    def get_student_mastery_progress(
+        self, student_id: str
+    ) -> Dict[str, Dict[str, float]]:
         """
         Get mastery progress for each subject.
 
@@ -601,11 +598,10 @@ class FeedbackSystem:
         return self.memory.get_mastery_progress(student_id)
 
 
-
-
-
-
 # Create conversational wrapper for ADK web
 # This exposes a conversational interface that wraps the processing pipeline
 from feedback_agent.conversational_agent import create_root_agent
-root_agent = create_root_agent()
+
+# Get model from environment and pass to conversational agent
+_model = os.getenv("MODEL_NAME", "gemini-1.5-flash")
+root_agent = create_root_agent(model=_model)

@@ -6,21 +6,13 @@ free-form text input with the structured exam processing pipeline.
 """
 
 import logging
-import os
-from pathlib import Path
 
-from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
-
-# Load environment variables
-_env_path = Path(__file__).parent / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
 
 logger = logging.getLogger(__name__)
 
 
-def create_root_agent() -> LlmAgent:
+def create_root_agent(model: str = "gemini-1.5-flash") -> LlmAgent:
     """
     Create a conversational agent for ADK web that wraps the exam processing pipeline.
 
@@ -28,11 +20,12 @@ def create_root_agent() -> LlmAgent:
     exams and receiving feedback. It acts as a bridge between ADK web's free-form text
     input and the structured FeedbackSystem.process_exam() pipeline.
 
+    Args:
+        model: The Gemini model to use for the conversational agent
+
     Returns:
         LlmAgent configured for conversational exam processing
     """
-    # Get model from environment or use default
-    model = os.getenv("MODEL_NAME", "gemini-1.5-flash")
 
     system_instruction = """You are an AI assistant for an automated exam correction system.
 
