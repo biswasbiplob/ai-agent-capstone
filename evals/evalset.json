@@ -1,0 +1,145 @@
+{
+  "name": "Exam Grading Evaluation Dataset",
+  "version": "1.0",
+  "description": "Comprehensive evaluation dataset for testing the feedback agent system's grading accuracy, analysis quality, and recommendation relevance.",
+  "test_cases": [
+    {
+      "id": "math_perfect_001",
+      "category": "grading_accuracy",
+      "difficulty": "easy",
+      "subject": "Mathematics",
+      "student_name": "Alice Johnson",
+      "exam_content": "1. What is 2 + 2?\nAnswer: 4\n\n2. What is 5 x 3?\nAnswer: 15\n\n3. What is 10 - 7?\nAnswer: 3",
+      "answer_key": "1. 4 (correct)\n2. 15 (correct)\n3. 3 (correct)",
+      "ground_truth": {
+        "total_score": 3,
+        "max_score": 3,
+        "percentage": 100.0,
+        "expected_weaknesses": [],
+        "expected_topics": ["Basic Arithmetic"]
+      }
+    },
+    {
+      "id": "math_partial_002",
+      "category": "grading_accuracy",
+      "difficulty": "medium",
+      "subject": "Mathematics",
+      "student_name": "Bob Chen",
+      "exam_content": "1. Solve for x: 2x + 5 = 15\nAnswer: x = 5\n\n2. What is the square root of 16?\nAnswer: 8\n\n3. Simplify: 3(x + 2) - 5\nAnswer: 3x + 1",
+      "answer_key": "1. x = 5 (correct)\n2. 4 (incorrect - student answered 8)\n3. 3x + 1 (correct)",
+      "ground_truth": {
+        "total_score": 2,
+        "max_score": 3,
+        "percentage": 66.67,
+        "expected_weaknesses": ["Square Roots", "Exponents"],
+        "expected_topics": ["Algebra", "Square Roots", "Expression Simplification"]
+      }
+    },
+    {
+      "id": "science_mixed_003",
+      "category": "grading_accuracy",
+      "difficulty": "medium",
+      "subject": "Science",
+      "student_name": "Carol Martinez",
+      "exam_content": "1. What is H2O?\nAnswer: Water\n\n2. What is the closest star to Earth?\nAnswer: The Moon\n\n3. What is photosynthesis?\nAnswer: Process by which plants make food using sunlight",
+      "answer_key": "1. Water (correct)\n2. The Sun (incorrect - student answered The Moon)\n3. Process by which plants make food using sunlight (correct)",
+      "ground_truth": {
+        "total_score": 2,
+        "max_score": 3,
+        "percentage": 66.67,
+        "expected_weaknesses": ["Astronomy", "Solar System"],
+        "expected_topics": ["Chemistry", "Astronomy", "Biology"]
+      }
+    },
+    {
+      "id": "physics_poor_004",
+      "category": "analysis_quality",
+      "difficulty": "hard",
+      "subject": "Physics",
+      "student_name": "David Lee",
+      "exam_content": "1. What is Newton's First Law?\nAnswer: Objects in motion stay in motion unless acted upon by a force\n\n2. Calculate force: mass = 10kg, acceleration = 5m/s²\nAnswer: F = 20N\n\n3. What is the speed of light?\nAnswer: 300,000 m/s\n\n4. Explain kinetic energy\nAnswer: Energy of movement, KE = 1/2 mv²",
+      "answer_key": "1. Correct (good explanation)\n2. F = 50N (incorrect - calculation error: 10 × 5 = 50, not 20)\n3. 300,000 km/s (incorrect units - should be km/s not m/s)\n4. Correct (good understanding)",
+      "ground_truth": {
+        "total_score": 2,
+        "max_score": 4,
+        "percentage": 50.0,
+        "expected_weaknesses": ["Basic Multiplication", "Unit Conversions", "Measurement Units"],
+        "expected_topics": ["Newton's Laws", "Force Calculations", "Speed of Light", "Kinetic Energy"]
+      }
+    },
+    {
+      "id": "history_weak_005",
+      "category": "analysis_quality",
+      "difficulty": "medium",
+      "subject": "History",
+      "student_name": "Emma Wilson",
+      "exam_content": "1. When did World War II end?\nAnswer: 1946\n\n2. Who was the first President of the United States?\nAnswer: George Washington\n\n3. What year was the Declaration of Independence signed?\nAnswer: 1777\n\n4. Who discovered America?\nAnswer: Christopher Columbus",
+      "answer_key": "1. 1945 (incorrect - off by 1 year)\n2. George Washington (correct)\n3. 1776 (incorrect - off by 1 year)\n4. Christopher Columbus (correct but simplified - more nuanced answer expected)",
+      "ground_truth": {
+        "total_score": 2,
+        "max_score": 4,
+        "percentage": 50.0,
+        "expected_weaknesses": ["Historical Dates", "WWII Timeline", "American Revolution Timeline"],
+        "expected_topics": ["WWII", "US Presidents", "Declaration of Independence", "Age of Exploration"]
+      }
+    },
+    {
+      "id": "chemistry_conceptual_006",
+      "category": "recommendation_relevance",
+      "difficulty": "hard",
+      "subject": "Chemistry",
+      "student_name": "Frank Garcia",
+      "exam_content": "1. What is the atomic number of Carbon?\nAnswer: 12\n\n2. Balance equation: H2 + O2 → H2O\nAnswer: 2H2 + O2 → 2H2O\n\n3. What is a covalent bond?\nAnswer: Sharing electrons\n\n4. Name the compound NaCl\nAnswer: Sodium Chloride",
+      "answer_key": "1. 6 (incorrect - student said 12, which is atomic mass)\n2. 2H2 + O2 → 2H2O (correct)\n3. Sharing electrons (correct but brief)\n4. Sodium Chloride (correct)",
+      "ground_truth": {
+        "total_score": 2.5,
+        "max_score": 4,
+        "percentage": 62.5,
+        "expected_weaknesses": ["Atomic Structure", "Atomic Number vs Atomic Mass"],
+        "expected_topics": ["Atomic Structure", "Chemical Equations", "Chemical Bonding", "Nomenclature"],
+        "expected_recommendations": [
+          "Review the difference between atomic number and atomic mass",
+          "Study the periodic table structure",
+          "Practice identifying atomic numbers"
+        ]
+      }
+    },
+    {
+      "id": "english_grammar_007",
+      "category": "recommendation_relevance",
+      "difficulty": "medium",
+      "subject": "English",
+      "student_name": "Grace Thompson",
+      "exam_content": "1. Identify the verb: The cat runs quickly.\nAnswer: runs\n\n2. What is a noun?\nAnswer: A person place or thing\n\n3. Correct this sentence: Me and him went to the store.\nAnswer: Him and me went to the store.\n\n4. What is an adjective?\nAnswer: A describing word",
+      "answer_key": "1. runs (correct)\n2. A person, place, or thing (correct)\n3. He and I went to the store (incorrect - still wrong subject pronouns)\n4. A word that describes a noun (correct but could be more precise)",
+      "ground_truth": {
+        "total_score": 2.5,
+        "max_score": 4,
+        "percentage": 62.5,
+        "expected_weaknesses": ["Subject Pronouns", "Grammar", "Sentence Structure"],
+        "expected_topics": ["Parts of Speech", "Verbs", "Nouns", "Pronouns", "Adjectives"],
+        "expected_recommendations": [
+          "Review subject pronoun usage (I vs me, he vs him)",
+          "Practice identifying correct pronoun forms in sentences",
+          "Study when to use 'I' vs 'me' in compound subjects"
+        ]
+      }
+    },
+    {
+      "id": "biology_failing_008",
+      "category": "grading_accuracy",
+      "difficulty": "hard",
+      "subject": "Biology",
+      "student_name": "Henry Rodriguez",
+      "exam_content": "1. What are the four bases in DNA?\nAnswer: A, T, G, C\n\n2. What is mitosis?\nAnswer: Cell division\n\n3. What is the powerhouse of the cell?\nAnswer: Nucleus\n\n4. What is natural selection?\nAnswer: Survival of the fastest\n\n5. What is an ecosystem?\nAnswer: Animals living together",
+      "answer_key": "1. A, T, G, C (correct)\n2. Cell division (correct but brief)\n3. Mitochondria (incorrect - said Nucleus)\n4. Process by which organisms best adapted to their environment survive (incorrect - oversimplified)\n5. A community of living organisms interacting with their environment (incorrect - incomplete)",
+      "ground_truth": {
+        "total_score": 1.5,
+        "max_score": 5,
+        "percentage": 30.0,
+        "expected_weaknesses": ["Cell Structure", "Organelle Functions", "Evolution Concepts", "Ecosystem Understanding"],
+        "expected_topics": ["DNA Structure", "Cell Division", "Cell Organelles", "Evolution", "Ecology"]
+      }
+    }
+  ]
+}

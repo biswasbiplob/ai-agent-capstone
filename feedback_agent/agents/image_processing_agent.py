@@ -1,91 +1,227 @@
-from google.adk.agents.llm_agent import Agent
-from google.genai import types
-from typing import Dict, Any
+"""
+Refactored ImageProcessingAgent using direct Gemini API calls with multimodal support.
+
+This agent extracts exam content and answer keys from images using Gemini's
+vision capabilities.
+
+Key improvements over the original:
+- Uses direct model API for simple stateless image processing
+- Properly handles multimodal input (images)
+- No dependency on custom run_agent_multimodal function
+- Async/await patterns
+- Structured JSON output
+"""
+
 import json
 import logging
+import os
+from typing import Dict, Any, Optional
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Configure logging
+from google.genai import types
+from feedback_agent.custom_llm import CustomGemini
+
 logger = logging.getLogger(__name__)
 
-class ImageProcessingAgent:
-    def __init__(self, model: str = 'gemini-2.5-pro'):
-        self.agent = Agent(
-            model=model,
-            name='image_processing_agent',
-            description='An agent that extracts text and answer keys from exam images.',
-            instruction='''
-            You are an expert OCR and document analysis AI.
-            Your task is to extract the content of an exam from an image.
-            
-            Input will be:
-            1. An image of an exam.
-            
-            Output must be a JSON object with the following structure:
-            {
-                "subject": <str> (e.g., "Math", "Biology"),
-                "exam_content": <str> (The full text of the questions and student answers, verbatim),
-                "answer_key": <str> (The answer key or rubric inferred from markings, or "Not found" if not present)
-            }
-            
-            If the subject is not explicitly stated, infer it from the content.
-            If the answer key is not visible (e.g., no checkmarks or corrections), set "answer_key" to "Not found".
-            ''',
-        )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+# Load environment variables
+load_dotenv()
 
-    def process_image(self, image_path: str = None, image_bytes: bytes = None) -> Dict[str, Any]:
-        logger.info("ImageProcessingAgent.process_image called.")
-        
-        prompt = "Please extract the exam content and answer key from this image."
-        
-        # Construct the content part with the image
-        # Note: The actual image handling depends on how ADK/Gemini accepts images.
-        # Assuming we can pass the image as a part in the prompt or context.
-        # For adk web, the image might be in the session history or passed differently.
-        # However, since we are refactoring to a sub-agent flow, we need to ensure this agent gets the image.
-        
-        # If running via adk web, the user input (with image) might have already been processed by the root agent
-        # and passed down. But here we want a dedicated agent.
-        
-        # In the context of `run_agent` utility, we need to support multimodal input.
-        # The current `run_agent` takes a string prompt. We might need to update it or use a different method.
-        
-        # For now, let's assume the `root_agent` passes the image description or we rely on the session context 
-        # if the image was uploaded in the same session. 
-        # BUT, to be robust, this agent should ideally receive the image data.
-        
-        # Given the constraints and the previous "adk web" context, the image is likely in the session.
-        # If we are chaining agents, we might need to pass the image explicitly.
-        
-        # Let's stick to the instruction-based extraction for now, assuming the image is available in the context 
-        # or passed as a part.
-        
-        # If we are using `run_agent` from utils, it creates a NEW session. This means the image from the 
-        # root agent's session won't be there unless we pass it.
-        # This is a critical architectural detail.
-        
-        # For the purpose of this refactor, let's assume we will pass the image content if available.
-        # Since `run_agent` in `utils.py` takes a string prompt, we might need to enhance it to take parts.
-        
-        from feedback_agent.utils import run_agent_multimodal
-        
-        # We need to implement run_agent_multimodal in utils.py
-        response_text = run_agent_multimodal(self.agent, prompt, image_path=image_path, image_bytes=image_bytes)
-        
-        logger.debug(f"ImageProcessingAgent raw response: {response_text[:200]}...")
-        
-        try:
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-            if start != -1 and end != -1:
-                json_str = response_text[start:end]
-                return json.loads(json_str)
-            else:
-                raise ValueError("No JSON found in response")
-        except Exception as e:
-            logger.error(f"Error parsing image processing response: {e}")
+
+class ImageProcessingAgentRefactored:
+    """
+    Refactored image processing agent using direct Gemini model calls.
+
+    This agent:
+    - Accepts image files (path or bytes)
+    - Uses Gemini's multimodal capabilities
+    - Extracts exam content and answer keys
+    - Returns structured JSON output
+    """
+
+    INSTRUCTION = '''
+You are an expert OCR and document analysis AI.
+Your task is to extract the content of an exam from an image.
+
+Analyze the image and extract:
+1. The subject of the exam (infer if not explicitly stated)
+2. All questions and student answers (verbatim text)
+3. Any answer key or rubric visible (markings, corrections, etc.)
+
+Output must be a JSON object with the following structure:
+{
+    "subject": <str> (e.g., "Mathematics", "Physics", "Biology"),
+    "exam_content": <str> (Full text of questions and answers),
+    "answer_key": <str> (Answer key/rubric, or "Not found" if not visible)
+}
+
+Be thorough in extracting all text from the image.
+If the subject is not stated, infer it from the content.
+If no answer key is visible, set "answer_key" to "Not found".
+'''
+
+    def __init__(self, model: str = None):
+        """
+        Initialize the image processing agent.
+
+        Args:
+            model: Gemini model to use (must support vision). If None, reads from MODEL_NAME env variable.
+
+        Raises:
+            ValueError: If model is None and MODEL_NAME is not set in .env
+        """
+        # Get model from environment or use provided value
+        if model is None:
+            model = os.getenv('MODEL_NAME')
+            if not model:
+                raise ValueError(
+                    "MODEL_NAME must be set in .env file. "
+                    "Add MODEL_NAME=<model-name> to feedback_agent/.env "
+                    "(e.g., MODEL_NAME=gemini-1.5-flash)"
+                )
+
+        self.model_name = model
+        self.model = CustomGemini(model=model)
+        logger.info(f"ImageProcessingAgentRefactored initialized with model {model}")
+
+    async def process_image(
+        self,
+        image_path: Optional[str] = None,
+        image_bytes: Optional[bytes] = None,
+        mime_type: str = "image/jpeg"
+    ) -> Dict[str, Any]:
+        """
+        Process an exam image and extract content.
+
+        Args:
+            image_path: Path to image file
+            image_bytes: Raw image bytes
+            mime_type: MIME type of the image (default: image/jpeg)
+
+        Returns:
+            Dictionary with extracted exam content:
+            {
+                "subject": str,
+                "exam_content": str,
+                "answer_key": str
+            }
+        """
+        logger.info("Processing exam image...")
+
+        # Validate input
+        if image_path is None and image_bytes is None:
+            logger.error("No image provided (need either image_path or image_bytes)")
             return {
                 "subject": "Unknown",
                 "exam_content": "",
-                "answer_key": "Not found"
+                "answer_key": "Not found",
+                "error": "No image provided"
             }
+
+        # Read image if path provided
+        if image_path and image_bytes is None:
+            try:
+                with open(image_path, "rb") as f:
+                    image_bytes = f.read()
+                logger.info(f"Read image from {image_path}")
+            except Exception as e:
+                logger.error(f"Error reading image file: {e}")
+                return {
+                    "subject": "Unknown",
+                    "exam_content": "",
+                    "answer_key": "Not found",
+                    "error": f"Failed to read image: {e}"
+                }
+
+        # Detect MIME type from path if provided
+        if image_path:
+            suffix = Path(image_path).suffix.lower()
+            mime_map = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+            }
+            mime_type = mime_map.get(suffix, mime_type)
+
+        # Create multimodal content with instruction and image
+        parts = [
+            types.Part(text=self.INSTRUCTION),
+            types.Part(text="Extract the exam content from this image."),
+            types.Part(
+                inline_data=types.Blob(
+                    data=image_bytes,
+                    mime_type=mime_type
+                )
+            )
+        ]
+
+        # Call model directly with multimodal input
+        try:
+            response = await self.model.generate_content(
+                model=self.model_name,
+                contents=[types.Content(role="user", parts=parts)],
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
+            )
+
+            # Extract response text
+            response_text = ""
+            if response.candidates:
+                for candidate in response.candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if part.text:
+                                response_text += part.text
+
+            logger.debug(f"Image processing response length: {len(response_text)}")
+
+            # Parse JSON response
+            if response_text:
+                # The agent is configured to return JSON, so parse it
+                result = json.loads(response_text)
+                logger.info(f"Successfully extracted exam content from image")
+                return result
+            else:
+                logger.warning("Empty response from image processing")
+                return {
+                    "subject": "Unknown",
+                    "exam_content": "",
+                    "answer_key": "Not found",
+                    "error": "Empty response from agent"
+                }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing image processing JSON: {e}")
+            logger.debug(f"Raw response: {response_text[:500]}")
+            # Try to extract JSON from response
+            try:
+                start = response_text.find('{')
+                end = response_text.rfind('}') + 1
+                if start != -1 and end != -1:
+                    json_str = response_text[start:end]
+                    return json.loads(json_str)
+            except:
+                pass
+
+            return {
+                "subject": "Unknown",
+                "exam_content": response_text if response_text else "",
+                "answer_key": "Not found",
+                "error": "Failed to parse JSON response"
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing image: {e}", exc_info=True)
+            return {
+                "subject": "Unknown",
+                "exam_content": "",
+                "answer_key": "Not found",
+                "error": f"Processing failed: {e}"
+            }
+
+
+# Create global instance for backward compatibility
+image_processor = ImageProcessingAgentRefactored()

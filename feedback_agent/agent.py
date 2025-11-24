@@ -11,7 +11,7 @@ from google.genai import types
 from feedback_agent.agents.analysis_agent import AnalysisAgent
 from feedback_agent.agents.grading_agent import GradingAgent
 from feedback_agent.agents.recommendation_agent import RecommendationAgent
-from feedback_agent.agents.image_processing_agent import ImageProcessingAgent
+from feedback_agent.agents.image_processing_agent import ImageProcessingAgentRefactored
 from feedback_agent.database import StudentDatabase
 from feedback_agent.custom_llm import CustomGemini
 
@@ -23,7 +23,7 @@ class FeedbackSystem:
     def __init__(self, db_path: str = "students.db"):
         self.db = StudentDatabase(db_path)
         # We keep ImageProcessingAgent here as it's stateless/custom
-        self.image_processing_agent = ImageProcessingAgent()
+        self.image_processing_agent = ImageProcessingAgentRefactored()
 
     def register_student(self, name: str) -> str:
         student_id = str(uuid.uuid4())

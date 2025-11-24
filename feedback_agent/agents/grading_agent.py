@@ -4,14 +4,29 @@ from typing import Dict, Any
 from google.genai import types
 
 import logging
+import os
+from dotenv import load_dotenv
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
 from feedback_agent.custom_llm import CustomGemini
 
 class GradingAgent:
-    def __init__(self, model: str = 'gemini-2.5-pro'):
+    def __init__(self, model: str = None):
+        # Get model from environment or use provided value
+        if model is None:
+            model = os.getenv('MODEL_NAME')
+            if not model:
+                raise ValueError(
+                    "MODEL_NAME must be set in .env file. "
+                    "Add MODEL_NAME=<model-name> to feedback_agent/.env "
+                    "(e.g., MODEL_NAME=gemini-1.5-flash)"
+                )
+
         self.agent = Agent(
             model=CustomGemini(model=model),
             name='grading_agent',

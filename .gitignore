@@ -8,3 +8,14 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Runtime files
+*.db
+*.log
+*.jsonl
+
+# Environment files with secrets
+.env
+
+# Evaluation results
+evals/eval_results_*.json

@@ -125,7 +125,7 @@ class StudentDatabase:
         ''', (exam_id,))
         row = cursor.fetchone()
         conn.close()
-        
+
         if row:
             return {
                 'grading': {
@@ -136,5 +136,75 @@ class StudentDatabase:
                     'weaknesses': json.loads(row['weaknesses']) if row['weaknesses'] else [],
                     'recommendations': row['recommendations'] # This is a string (JSON or text)
                 }
+            }
+        return None
+
+    def get_all_students(self) -> List[Dict]:
+        """Get all students in the database."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, name FROM students')
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [{'student_id': row['id'], 'name': row['name']} for row in rows]
+
+    def get_student(self, student_id: str) -> Optional[Dict]:
+        """Get a specific student by ID."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, name FROM students WHERE id = ?', (student_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {'student_id': row['id'], 'name': row['name']}
+        return None
+
+    def get_student_exams(self, student_id: str) -> List[Dict]:
+        """Get all exams for a specific student."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, student_id, subject, date, total_score, max_score
+            FROM exams
+            WHERE student_id = ?
+            ORDER BY date DESC
+        ''', (student_id,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        exams = []
+        for row in rows:
+            exams.append({
+                'exam_id': row['id'],
+                'student_id': row['student_id'],
+                'subject': row['subject'],
+                'date': row['date'],
+                'total_score': row['total_score'],
+                'max_score': row['max_score']
+            })
+        return exams
+
+    def get_analysis(self, exam_id: str) -> Optional[Dict]:
+        """Get analysis data for a specific exam."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT weaknesses, recommendations
+            FROM analysis
+            WHERE exam_id = ?
+        ''', (exam_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                'weaknesses': json.loads(row['weaknesses']) if row['weaknesses'] else [],
+                'recommendations': row['recommendations']
             }
         return None
