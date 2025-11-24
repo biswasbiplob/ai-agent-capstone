@@ -11,17 +11,18 @@ This demo showcases all key features:
 
 import asyncio
 import json
+import uuid
 from pathlib import Path
 
 from feedback_agent.agent import FeedbackSystem
-from feedback_agent.auth import AuthenticationService, UserRole
+from feedback_agent.auth import auth_service, UserRole
 from feedback_agent.authorization import (
+    set_database,
     get_my_performance,
     get_student_performance,
     get_class_statistics,
     list_my_students
 )
-from google.adk.tools import ToolContext
 
 
 def print_section(title: str):
@@ -29,6 +30,23 @@ def print_section(title: str):
     print("\n" + "=" * 70)
     print(f"  {title}")
     print("=" * 70 + "\n")
+
+
+def create_mock_tool_context(user_id: str):
+    """
+    Create a mock ToolContext for testing authorization tools.
+
+    Args:
+        user_id: ID of the user to set in context
+
+    Returns:
+        Mock object with user_id in state
+    """
+    class MockToolContext:
+        def __init__(self, user_id: str):
+            self.state = {"current_user_id": user_id}
+
+    return MockToolContext(user_id)
 
 
 async def demo_basic_exam_processing():
@@ -113,11 +131,13 @@ async def demo_role_based_access():
     """Demo 2: Role-based access control"""
     print_section("DEMO 2: Role-Based Access Control")
 
-    # Initialize auth service and database
+    # Initialize database
     from feedback_agent.database import StudentDatabase
 
-    auth_service = AuthenticationService()
     db = StudentDatabase("demo.db")
+
+    # Configure authorization tools with database
+    set_database(db)
 
     # Register users
     print("👥 Registering users...")
@@ -126,47 +146,65 @@ async def demo_role_based_access():
     print(f"✅ Student: {student_user.name} ({student_user.role.value})")
     print(f"✅ Teacher: {teacher_user.name} ({teacher_user.role.value})\n")
 
-    # Create sessions
-    student_session = auth_service.create_session(student_user.user_id)
-    teacher_session = auth_service.create_session(teacher_user.user_id)
+    # Add students to database and create test exam data
+    print("📝 Creating test exam data...")
+    db.add_student(student_user.user_id, student_user.name)
+    exam_id = str(uuid.uuid4())
+    db.log_exam(exam_id, student_user.user_id, "Mathematics", 85.0, 100.0)
+    db.log_analysis(exam_id, weaknesses=[
+        {"topic": "Algebra", "description": "Struggles with quadratic equations", "severity": "medium"}
+    ])
+    print("✅ Test data created!\n")
 
     # Demo: Student accessing own data
     print("📊 Student accessing own performance...")
     try:
-        student_context = ToolContext(session_id=student_session.session_id)
-        performance = await get_my_performance(student_context)
-        print(f"✅ Success! Student can see own data")
-        print(f"   Exams found: {len(performance.get('exams', []))}")
+        student_context = create_mock_tool_context(student_user.user_id)
+        performance = get_my_performance(student_context)
+        if performance.get('status') == 'success':
+            print(f"✅ Success! Student can see own data")
+            print(f"   Exams found: {performance.get('summary', {}).get('total_exams', 0)}")
+        else:
+            print(f"⚠️  Warning: {performance.get('message', 'Unknown error')}")
     except Exception as e:
         print(f"❌ Error: {e}")
 
     # Demo: Student trying to access other student
     print("\n🔒 Student trying to access another student's data...")
     try:
-        student_context = ToolContext(session_id=student_session.session_id)
-        other_performance = await get_student_performance(student_context, "other_student_id")
-        print(f"⚠️ Unexpected: Student accessed other student's data!")
-    except PermissionError as e:
-        print(f"✅ Correctly blocked: {e}")
+        student_context = create_mock_tool_context(student_user.user_id)
+        other_performance = get_student_performance(student_context, "other_student_id")
+        if other_performance.get('status') == 'error' and 'Permission denied' in other_performance.get('message', ''):
+            print(f"✅ Correctly blocked: {other_performance['message']}")
+        else:
+            print(f"⚠️ Unexpected: Student accessed other student's data!")
+    except Exception as e:
+        print(f"❌ Error: {e}")
 
     # Demo: Teacher accessing student data
     print("\n👨‍🏫 Teacher accessing student performance...")
     try:
-        teacher_context = ToolContext(session_id=teacher_session.session_id)
-        student_list = await list_my_students(teacher_context)
-        print(f"✅ Success! Teacher can see all students")
-        print(f"   Total students: {len(student_list.get('students', []))}")
+        teacher_context = create_mock_tool_context(teacher_user.user_id)
+        student_list = list_my_students(teacher_context)
+        if student_list.get('status') == 'success':
+            print(f"✅ Success! Teacher can see all students")
+            print(f"   Total students: {len(student_list.get('students', []))}")
+        else:
+            print(f"⚠️  Warning: {student_list.get('message', 'Unknown error')}")
     except Exception as e:
         print(f"❌ Error: {e}")
 
     # Demo: Teacher viewing class statistics
     print("\n📈 Teacher viewing class statistics...")
     try:
-        teacher_context = ToolContext(session_id=teacher_session.session_id)
-        stats = await get_class_statistics(teacher_context)
-        print(f"✅ Success! Teacher can see class stats")
-        print(f"   Total exams: {stats.get('total_exams', 0)}")
-        print(f"   Average score: {stats.get('average_score', 0):.1f}%")
+        teacher_context = create_mock_tool_context(teacher_user.user_id)
+        stats = get_class_statistics(teacher_context)
+        if stats.get('status') == 'success':
+            print(f"✅ Success! Teacher can see class stats")
+            print(f"   Total exams: {stats.get('total_exams', 0)}")
+            print(f"   Average score: {stats.get('average_score', 0):.1f}%")
+        else:
+            print(f"⚠️  Warning: {stats.get('message', 'Unknown error')}")
     except Exception as e:
         print(f"❌ Error: {e}")
 

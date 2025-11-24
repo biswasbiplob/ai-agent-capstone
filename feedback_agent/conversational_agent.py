@@ -12,7 +12,7 @@ from google.adk.agents import LlmAgent
 logger = logging.getLogger(__name__)
 
 
-def create_root_agent(model: str = "gemini-1.5-flash") -> LlmAgent:
+def create_root_agent(model: str) -> LlmAgent:
     """
     Create a conversational agent for ADK web that wraps the exam processing pipeline.
 
