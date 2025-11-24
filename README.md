@@ -58,6 +58,8 @@ Try the interactive demo:
 python demo.py
 ```
 
+**Note**: This agent is designed for programmatic use (via Python API), not as a conversational agent. Use `demo.py` for interactive demonstrations rather than `adk web`.
+
 Select from 5 demos:
 1. Basic Exam Processing - See how grading works
 2. Role-Based Access Control - Student vs Teacher permissions
