@@ -19,22 +19,26 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from google.adk.agents.sequential_agent import SequentialAgent
-
-# Load environment variables from .env file for ADK web
-_env_path = Path(__file__).parent / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
 from google.adk.agents.callback_context import CallbackContext
+from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.plugins import LoggingPlugin
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
 
+# Load environment variables from .env file
+# Try specific path first, then fall back to current directory
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
+else:
+    load_dotenv()  # Load from current directory or system environment
+
 from feedback_agent.agents.analysis_agent import AnalysisAgent
 from feedback_agent.agents.grading_agent import GradingAgent
 from feedback_agent.agents.recommendation_agent import RecommendationAgent
+from feedback_agent.conversational_agent import create_root_agent
 from feedback_agent.database import StudentDatabase
 from feedback_agent.memory import MemoryService
 from feedback_agent.plugins import ExamMetricsPlugin
@@ -600,8 +604,13 @@ class FeedbackSystem:
 
 # Create conversational wrapper for ADK web
 # This exposes a conversational interface that wraps the processing pipeline
-from feedback_agent.conversational_agent import create_root_agent
 
 # Get model from environment and pass to conversational agent
-_model = os.getenv("MODEL_NAME", "gemini-1.5-flash")
-root_agent = create_root_agent(model=_model)
+model = os.getenv("MODEL_NAME")
+if not model:
+    raise ValueError(
+        "MODEL_NAME must be set in .env file. "
+        "Add MODEL_NAME=<model-name> to feedback_agent/.env "
+        "(e.g., MODEL_NAME=gemini-1.5-flash)"
+    )
+root_agent = create_root_agent(model=model)

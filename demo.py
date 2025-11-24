@@ -127,8 +127,8 @@ async def demo_role_based_access():
     print(f"✅ Teacher: {teacher_user.name} ({teacher_user.role.value})\n")
 
     # Create sessions
-    student_session = auth_service.login(student_user.user_id)
-    teacher_session = auth_service.login(teacher_user.user_id)
+    student_session = auth_service.create_session(student_user.user_id)
+    teacher_session = auth_service.create_session(teacher_user.user_id)
 
     # Demo: Student accessing own data
     print("📊 Student accessing own performance...")
