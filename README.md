@@ -337,8 +337,3 @@ Educational project for Kaggle AI Agents course capstone.
 - Google Agent Development Kit (ADK) team
 - Google Gemini API
 
----
-
-**Status**: Production-ready
-**Last Updated**: 2025-01-24
-**All Tests**: Passing ✅

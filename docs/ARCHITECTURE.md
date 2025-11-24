@@ -159,8 +159,8 @@ get_metrics_summary() -> dict
 ```
 
 **Configuration Options**:
-- `db_path`: Student/exam database location
-- `session_db_url`: Session storage (SQLite URL)
+- `db_path`: Student/exam database location (default: `data/students.db`)
+- `session_db_url`: Session storage (default: `sqlite:///data/feedback_sessions.db`)
 - `use_memory_sessions`: Use in-memory sessions (testing only)
 - `enable_metrics`: Enable ExamMetricsPlugin
 - `metrics_file`: Metrics output file path
@@ -791,9 +791,10 @@ alignment = matching_recommendations / expected_recommendations
 ### Data Storage
 
 - **SQLite**:
-  - Student/exam database (`students.db`)
-  - Session storage (`feedback_sessions.db`)
+  - Student/exam database (`data/students.db`)
+  - Session storage (`data/feedback_sessions.db`)
   - Metrics cache (in-memory + JSONL file)
+  - All database files organized in `data/` directory
 
 ### Development Tools
 
@@ -956,8 +957,8 @@ GOOGLE_API_KEY=your_api_key_here
 MODEL_NAME="gemini-2.0-flash"  # or gemini-1.5-pro, gemini-2.5-pro
 
 # Database Paths
-STUDENT_DB_PATH="students.db"
-SESSION_DB_URL="sqlite:///feedback_sessions.db"
+STUDENT_DB_PATH="data/students.db"
+SESSION_DB_URL="sqlite:///data/feedback_sessions.db"
 
 # Metrics
 METRICS_ENABLED=true
@@ -969,13 +970,17 @@ METRICS_FILE="exam_metrics.jsonl"
 ```
 ai_agent_capstone/
 ├── .adr/                          # Architecture Decision Records
+├── data/                          # Runtime database files
+│   ├── students.db                # Student/exam database
+│   ├── feedback_sessions.db       # ADK session storage
+│   └── *.db                       # Test databases
 ├── feedback_agent/
 │   ├── agents/
 │   │   ├── grading_agent.py
 │   │   ├── analysis_agent.py
 │   │   ├── recommendation_agent.py
 │   │   └── image_processing_agent.py
-│   ├── agent.py        # Main system
+│   ├── agent.py                   # Main system
 │   ├── auth.py                    # Authentication
 │   ├── authorization.py           # Authorization tools
 │   ├── database.py                # Data persistence
@@ -990,8 +995,11 @@ ai_agent_capstone/
 │   ├── test_authorization.py
 │   ├── test_image_processing.py
 │   ├── test_observability.py
+│   ├── test_memory.py
 │   └── test_refactored_agent.py
-├── ARCHITECTURE.md                # This document
+├── docs/
+│   ├── ARCHITECTURE.md            # This document
+│   └── CAPSTONE_REPORT.md         # Project report
 ├── README.md                      # User documentation
 ├── PROGRESS.md                    # Development tracking
 └── pyproject.toml                 # Dependencies

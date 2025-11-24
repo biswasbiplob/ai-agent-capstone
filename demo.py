@@ -15,13 +15,13 @@ import uuid
 from pathlib import Path
 
 from feedback_agent.agent import FeedbackSystem
-from feedback_agent.auth import auth_service, UserRole
+from feedback_agent.auth import UserRole, auth_service
 from feedback_agent.authorization import (
-    set_database,
+    get_class_statistics,
     get_my_performance,
     get_student_performance,
-    get_class_statistics,
-    list_my_students
+    list_my_students,
+    set_database,
 )
 
 
@@ -42,6 +42,7 @@ def create_mock_tool_context(user_id: str):
     Returns:
         Mock object with user_id in state
     """
+
     class MockToolContext:
         def __init__(self, user_id: str):
             self.state = {"current_user_id": user_id}
@@ -59,7 +60,7 @@ async def demo_basic_exam_processing():
         db_path="data/demo.db",
         session_db_url="sqlite:///data/demo_sessions.db",
         enable_metrics=True,
-        metrics_file="demo_metrics.jsonl"
+        metrics_file="demo_metrics.jsonl",
     )
     print("✅ System initialized\n")
 
@@ -93,24 +94,26 @@ async def demo_basic_exam_processing():
         exam_content=exam_content,
         answer_key=answer_key,
         subject="Mathematics",
-        user_id="demo_user"
+        user_id="demo_user",
     )
 
     # Display results
     print("\n📊 RESULTS:")
-    print(f"   Score: {result['total_score']}/{result['max_score']} ({result['percentage']:.1f}%)")
+    print(
+        f"   Score: {result['total_score']}/{result['max_score']} ({result['percentage']:.1f}%)"
+    )
     print(f"   Weaknesses identified: {len(result['weaknesses'])}")
 
-    if result['weaknesses']:
+    if result["weaknesses"]:
         print("\n   Weaknesses:")
-        for i, weakness in enumerate(result['weaknesses'], 1):
+        for i, weakness in enumerate(result["weaknesses"], 1):
             print(f"      {i}. {weakness['topic']} ({weakness['severity']})")
             print(f"         {weakness['description']}")
 
     print("\n   Recommendations:")
     try:
-        recommendations = json.loads(result['recommendations'])
-        for i, obj in enumerate(recommendations.get('learning_objectives', []), 1):
+        recommendations = json.loads(result["recommendations"])
+        for i, obj in enumerate(recommendations.get("learning_objectives", []), 1):
             print(f"      {i}. {obj['objective']}")
             print(f"         Time: {obj.get('estimated_time', 'N/A')}")
     except (json.JSONDecodeError, KeyError):
@@ -122,7 +125,7 @@ async def demo_basic_exam_processing():
     if summary:
         print(f"   Total exams processed: {summary['total_exams_processed']}")
         print(f"   Average processing time: {summary['avg_processing_time']:.2f}s")
-        print(f"   Success rate: {summary['success_rate']*100:.1f}%")
+        print(f"   Success rate: {summary['success_rate'] * 100:.1f}%")
 
     return system, student_id
 
@@ -141,8 +144,12 @@ async def demo_role_based_access():
 
     # Register users
     print("👥 Registering users...")
-    student_user = auth_service.register_user("student_001", "Bob Smith", UserRole.STUDENT)
-    teacher_user = auth_service.register_user("teacher_001", "Dr. Jane Doe", UserRole.TEACHER)
+    student_user = auth_service.register_user(
+        "student_001", "Bob Smith", UserRole.STUDENT
+    )
+    teacher_user = auth_service.register_user(
+        "teacher_001", "Dr. Jane Doe", UserRole.TEACHER
+    )
     print(f"✅ Student: {student_user.name} ({student_user.role.value})")
     print(f"✅ Teacher: {teacher_user.name} ({teacher_user.role.value})\n")
 
@@ -151,9 +158,16 @@ async def demo_role_based_access():
     db.add_student(student_user.user_id, student_user.name)
     exam_id = str(uuid.uuid4())
     db.log_exam(exam_id, student_user.user_id, "Mathematics", 85.0, 100.0)
-    db.log_analysis(exam_id, weaknesses=[
-        {"topic": "Algebra", "description": "Struggles with quadratic equations", "severity": "medium"}
-    ])
+    db.log_analysis(
+        exam_id,
+        weaknesses=[
+            {
+                "topic": "Algebra",
+                "description": "Struggles with quadratic equations",
+                "severity": "medium",
+            }
+        ],
+    )
     print("✅ Test data created!\n")
 
     # Demo: Student accessing own data
@@ -161,9 +175,11 @@ async def demo_role_based_access():
     try:
         student_context = create_mock_tool_context(student_user.user_id)
         performance = get_my_performance(student_context)
-        if performance.get('status') == 'success':
-            print(f"✅ Success! Student can see own data")
-            print(f"   Exams found: {performance.get('summary', {}).get('total_exams', 0)}")
+        if performance.get("status") == "success":
+            print("✅ Success! Student can see own data")
+            print(
+                f"   Exams found: {performance.get('summary', {}).get('total_exams', 0)}"
+            )
         else:
             print(f"⚠️  Warning: {performance.get('message', 'Unknown error')}")
     except Exception as e:
@@ -174,10 +190,12 @@ async def demo_role_based_access():
     try:
         student_context = create_mock_tool_context(student_user.user_id)
         other_performance = get_student_performance(student_context, "other_student_id")
-        if other_performance.get('status') == 'error' and 'Permission denied' in other_performance.get('message', ''):
+        if other_performance.get(
+            "status"
+        ) == "error" and "Permission denied" in other_performance.get("message", ""):
             print(f"✅ Correctly blocked: {other_performance['message']}")
         else:
-            print(f"⚠️ Unexpected: Student accessed other student's data!")
+            print("⚠️ Unexpected: Student accessed other student's data!")
     except Exception as e:
         print(f"❌ Error: {e}")
 
@@ -186,8 +204,8 @@ async def demo_role_based_access():
     try:
         teacher_context = create_mock_tool_context(teacher_user.user_id)
         student_list = list_my_students(teacher_context)
-        if student_list.get('status') == 'success':
-            print(f"✅ Success! Teacher can see all students")
+        if student_list.get("status") == "success":
+            print("✅ Success! Teacher can see all students")
             print(f"   Total students: {len(student_list.get('students', []))}")
         else:
             print(f"⚠️  Warning: {student_list.get('message', 'Unknown error')}")
@@ -199,8 +217,8 @@ async def demo_role_based_access():
     try:
         teacher_context = create_mock_tool_context(teacher_user.user_id)
         stats = get_class_statistics(teacher_context)
-        if stats.get('status') == 'success':
-            print(f"✅ Success! Teacher can see class stats")
+        if stats.get("status") == "success":
+            print("✅ Success! Teacher can see class stats")
             print(f"   Total exams: {stats.get('total_exams', 0)}")
             print(f"   Average score: {stats.get('average_score', 0):.1f}%")
         else:
@@ -213,7 +231,9 @@ async def demo_image_processing():
     """Demo 3: Image-based exam processing"""
     print_section("DEMO 3: Image-Based Exam Processing")
 
-    from feedback_agent.agents.image_processing_agent import ImageProcessingAgentRefactored
+    from feedback_agent.agents.image_processing_agent import (
+        ImageProcessingAgentRefactored,
+    )
 
     print("🖼️  Looking for sample exam images...")
     image_dir = Path("feedback_agent/input_images")
@@ -229,7 +249,7 @@ async def demo_image_processing():
         return
 
     # Process first image
-    sample_image = image_files[0]
+    sample_image = image_files[1]
     print(f"📸 Processing: {sample_image.name}\n")
 
     try:
@@ -255,7 +275,7 @@ async def demo_metrics_tracking():
         db_path="data/demo.db",
         session_db_url="sqlite:///data/demo_sessions.db",
         enable_metrics=True,
-        metrics_file="demo_metrics.jsonl"
+        metrics_file="demo_metrics.jsonl",
     )
 
     # Register student
@@ -266,8 +286,16 @@ async def demo_metrics_tracking():
 
     exams = [
         ("Math", "1. 2+2=? A: 4\n2. 3+3=? A: 6", "1. 4\n2. 6"),
-        ("Science", "1. H2O is? A: Water\n2. CO2 is? A: Carbon dioxide", "1. Water\n2. Carbon dioxide"),
-        ("History", "1. Who discovered America? A: Columbus\n2. Year? A: 1492", "1. Columbus\n2. 1492")
+        (
+            "Science",
+            "1. H2O is? A: Water\n2. CO2 is? A: Carbon dioxide",
+            "1. Water\n2. Carbon dioxide",
+        ),
+        (
+            "History",
+            "1. Who discovered America? A: Columbus\n2. Year? A: 1492",
+            "1. Columbus\n2. 1492",
+        ),
     ]
 
     for i, (subject, content, key) in enumerate(exams, 1):
@@ -277,7 +305,7 @@ async def demo_metrics_tracking():
             exam_content=content,
             answer_key=key,
             subject=subject,
-            user_id="demo_user"
+            user_id="demo_user",
         )
 
     print("\n✅ All exams processed!\n")
@@ -290,15 +318,17 @@ async def demo_metrics_tracking():
     metrics_file = Path("demo_metrics.jsonl")
     if metrics_file.exists():
         print(f"\n📄 Metrics file created: {metrics_file}")
-        with open(metrics_file, 'r') as f:
+        with open(metrics_file, "r") as f:
             lines = f.readlines()
             print(f"   Total metrics entries: {len(lines)}")
             if lines:
                 sample = json.loads(lines[0])
-                print(f"\n   Sample metric entry:")
+                print("\n   Sample metric entry:")
                 print(f"      Session ID: {sample.get('session_id')}")
                 print(f"      Duration: {sample.get('total_duration', 0):.2f}s")
-                print(f"      Score: {sample.get('total_score', 0)}/{sample.get('max_score', 0)}")
+                print(
+                    f"      Score: {sample.get('total_score', 0)}/{sample.get('max_score', 0)}"
+                )
 
 
 async def demo_complete_workflow():
@@ -312,7 +342,7 @@ async def demo_complete_workflow():
     system = FeedbackSystem(
         db_path="data/demo_complete.db",
         session_db_url="sqlite:///data/demo_complete_sessions.db",
-        enable_metrics=True
+        enable_metrics=True,
     )
     print("   ✅ System ready\n")
 
@@ -341,22 +371,24 @@ async def demo_complete_workflow():
         exam_content=exam_content,
         answer_key=answer_key,
         subject="General Knowledge",
-        user_id="demo_user"
+        user_id="demo_user",
     )
-    print(f"   ✅ Exam processed\n")
+    print("   ✅ Exam processed\n")
 
     # 4. View results
     print("4️⃣  View results")
-    print(f"   📊 Score: {result['total_score']}/{result['max_score']} ({result['percentage']:.1f}%)")
+    print(
+        f"   📊 Score: {result['total_score']}/{result['max_score']} ({result['percentage']:.1f}%)"
+    )
     print(f"   📋 Weaknesses: {len(result['weaknesses'])} identified")
-    print(f"   💡 Recommendations: Generated\n")
+    print("   💡 Recommendations: Generated\n")
 
     # 5. Track metrics
     print("5️⃣  Track performance metrics")
     summary = system.get_metrics_summary()
     if summary:
         print(f"   📈 Processing time: {summary['avg_processing_time']:.2f}s")
-        print(f"   ✅ Success rate: {summary['success_rate']*100:.0f}%\n")
+        print(f"   ✅ Success rate: {summary['success_rate'] * 100:.0f}%\n")
 
     print("🎉 Complete workflow demonstration finished!")
 
@@ -379,7 +411,7 @@ async def main():
         ("Role-Based Access Control", demo_role_based_access),
         ("Image Processing", demo_image_processing),
         ("Metrics Tracking", demo_metrics_tracking),
-        ("Complete Workflow", demo_complete_workflow)
+        ("Complete Workflow", demo_complete_workflow),
     ]
 
     print("\n📋 Available Demos:")
@@ -409,6 +441,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Error running demo: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n\n" + "=" * 70)
