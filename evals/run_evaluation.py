@@ -89,6 +89,7 @@ class EvaluationRunner:
         self.feedback_system = FeedbackSystem(
             db_path=self.db_path,
             use_memory_sessions=True,  # Use in-memory sessions for evaluation
+            enable_logging_plugin=False,  # Disable verbose logging for evaluation
         )
         logger.info("Agent system initialized successfully")
 

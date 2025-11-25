@@ -73,6 +73,7 @@ class FeedbackSystem:
         use_memory_sessions: bool = False,
         enable_metrics: bool = True,
         metrics_file: str = "exam_metrics.jsonl",
+        enable_logging_plugin: bool = True,
     ):
         """
         Initialize the feedback system.
@@ -83,6 +84,7 @@ class FeedbackSystem:
             use_memory_sessions: If True, use InMemorySessionService (for testing)
             enable_metrics: If True, enable ExamMetricsPlugin for observability
             metrics_file: Path to metrics file (JSONL format)
+            enable_logging_plugin: If True, enable verbose LoggingPlugin output (disable for evaluations)
         """
         self.db = StudentDatabase(db_path)
 
@@ -104,10 +106,14 @@ class FeedbackSystem:
         # Initialize plugins
         self.plugins = []
 
-        # Add LoggingPlugin for ADK built-in observability
-        self.logging_plugin = LoggingPlugin()
-        self.plugins.append(self.logging_plugin)
-        logger.info("📝 LoggingPlugin enabled for ADK observability")
+        # Add LoggingPlugin for ADK built-in observability (optional)
+        if enable_logging_plugin:
+            self.logging_plugin = LoggingPlugin()
+            self.plugins.append(self.logging_plugin)
+            logger.info("📝 LoggingPlugin enabled for ADK observability")
+        else:
+            self.logging_plugin = None
+            logger.info("📝 LoggingPlugin disabled (evaluation mode)")
 
         # Add custom metrics plugin if enabled
         if enable_metrics:
