@@ -50,21 +50,22 @@ logging.getLogger("feedback_agent").setLevel(logging.WARNING)
 # ============================================================================
 # Model Rate Limit Configuration
 # ============================================================================
-# Maps model names to minimum wait time between API calls (in seconds)
-# Formula: (60 / requests_per_minute) * 1.1 buffer
-# 10% buffer accounts for network latency and multiple agent calls per test
+# Maps model names to minimum wait time between TESTS (in seconds)
+# Each test makes ~6 API calls (grading + analysis + 3 parallel + synthesis)
+# Formula: (60 / requests_per_minute) * calls_per_test * 1.2 buffer
+# 20% buffer accounts for network latency and timing variations
 # ============================================================================
 
 MODEL_RATE_LIMITS = {
-    # 15 RPM models: (60/15) * 1.1 = 4.4 → 5 seconds
-    "gemini-1.5-flash": 5,
-    "gemini-2.0-flash": 5,
-    "gemini-2.0-flash-exp": 5,
-    # 10 RPM models: (60/10) * 1.1 = 6.6 → 7 seconds
-    "gemini-2.5-flash": 7,
-    # 2 RPM models: (60/2) * 1.1 = 33 seconds
-    "gemini-1.5-pro": 33,
-    "gemini-2.5-pro": 33,
+    # 15 RPM models: (60/15) * 6 * 1.2 = 28.8 → 30 seconds
+    "gemini-1.5-flash": 30,
+    "gemini-2.0-flash": 30,
+    "gemini-2.0-flash-exp": 30,
+    # 10 RPM models: (60/10) * 6 * 1.2 = 43.2 → 45 seconds
+    "gemini-2.5-flash": 45,
+    # 2 RPM models: (60/2) * 6 * 1.2 = 216 → 220 seconds
+    "gemini-1.5-pro": 220,
+    "gemini-2.5-pro": 220,
 }
 
 

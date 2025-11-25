@@ -19,13 +19,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.callback_context import CallbackContext
+from google.adk.agents.invocation_context import InvocationContext
+from google.adk.agents.llm_agent import Agent as LlmAgent
+from google.adk.agents.loop_agent import LoopAgent
+from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.apps.app import App, EventsCompactionConfig
+from google.adk.events import Event, EventActions
 from google.adk.plugins import LoggingPlugin
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
+from typing import AsyncGenerator
 
 # Load environment variables from .env file
 # Try specific path first, then fall back to current directory
@@ -53,6 +60,96 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+class ValidationAgent(BaseAgent):
+    """
+    Custom validation agent for LoopAgent quality assurance.
+
+    Checks analysis quality and emits escalation events to control loop iteration:
+    - escalate=True: Stop loop (validation passed, we're done)
+    - escalate=False: Continue loop (validation failed, retry needed)
+    """
+
+    def __init__(self, name: str = "validation_agent"):
+        super().__init__(
+            name=name,
+            description="Validates analysis quality and controls loop retry"
+        )
+
+    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        """
+        Validate analysis in state and emit escalation signal.
+
+        Returns:
+            Event with escalate=True if validation passes (stop loop)
+            Event with escalate=False if validation fails (continue loop)
+        """
+        try:
+            analysis_str = ctx.session.state.get("weakness_analysis")
+
+            # Validation failed: no analysis in state
+            if not analysis_str:
+                logger.warning("❌ Validation failed: No weakness_analysis in state")
+                yield Event(
+                    author=self.name,
+                    actions=EventActions(escalate=False)  # Continue loop to retry
+                )
+                return
+
+            analysis = json.loads(analysis_str)
+
+            # Check 1: Topics field exists and has at least one topic
+            topics = analysis.get("topics", [])
+            if not topics or len(topics) == 0:
+                logger.warning(f"❌ Validation failed: Topics field is empty")
+                yield Event(
+                    author=self.name,
+                    actions=EventActions(escalate=False)  # Continue loop to retry
+                )
+                return
+
+            # Check 2: Weaknesses structure is valid
+            weaknesses = analysis.get("weaknesses", [])
+            if isinstance(weaknesses, list):
+                for w in weaknesses:
+                    if not isinstance(w, dict) or "topic" not in w:
+                        logger.warning("❌ Validation failed: Invalid weakness structure")
+                        yield Event(
+                            author=self.name,
+                            actions=EventActions(escalate=False)  # Continue loop to retry
+                        )
+                        return
+
+            # Check 3: Summary exists and is substantive
+            summary = analysis.get("summary", "")
+            if not summary or len(summary) < 20:
+                logger.warning("❌ Validation failed: Summary too short (< 20 characters)")
+                yield Event(
+                    author=self.name,
+                    actions=EventActions(escalate=False)  # Continue loop to retry
+                )
+                return
+
+            # All checks passed!
+            logger.info(f"✅ Analysis quality validated: {len(topics)} topics, {len(weaknesses)} weaknesses")
+            yield Event(
+                author=self.name,
+                actions=EventActions(escalate=True)  # Stop loop, validation passed!
+            )
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"❌ Validation failed: Invalid JSON in analysis: {e}")
+            yield Event(
+                author=self.name,
+                actions=EventActions(escalate=False)  # Continue loop to retry
+            )
+        except Exception as e:
+            logger.error(f"❌ Validation error: {e}")
+            yield Event(
+                author=self.name,
+                actions=EventActions(escalate=False)  # Continue loop to retry
+            )
 
 
 class FeedbackSystem:
@@ -138,30 +235,203 @@ class FeedbackSystem:
 
         self.runner = Runner(app=self.app, session_service=self.session_service)
 
-        logger.info("✅ FeedbackSysteminitialized with Runner pattern")
+        logger.info("✅ FeedbackSystem initialized with Runner pattern")
+
+    def _create_study_materials_agent(self) -> LlmAgent:
+        """Create specialized agent for study materials recommendations."""
+        from feedback_agent.custom_llm import CustomGemini
+
+        agent = LlmAgent(
+            model=CustomGemini(model=os.getenv('MODEL_NAME')),
+            name='study_materials_agent',
+            description='Generates curated study materials and resources',
+            instruction='''
+            Based on the weakness analysis: {weakness_analysis}
+
+            Generate specific study materials and resources for each weak topic.
+            Focus on textbooks, online courses, video tutorials, and practice resources.
+
+            Output JSON with:
+            {{
+                "study_materials": [
+                    {{
+                        "topic": <str>,
+                        "resources": [
+                            {{
+                                "type": <str> (textbook/video/course/article),
+                                "title": <str>,
+                                "description": <str>,
+                                "difficulty": <str> (beginner/intermediate/advanced)
+                            }}
+                        ]
+                    }}
+                ]
+            }}
+            '''
+        )
+        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        agent.output_key = "study_materials"
+        return agent
+
+    def _create_practice_problems_agent(self) -> LlmAgent:
+        """Create specialized agent for practice problems."""
+        from feedback_agent.custom_llm import CustomGemini
+
+        agent = LlmAgent(
+            model=CustomGemini(model=os.getenv('MODEL_NAME')),
+            name='practice_problems_agent',
+            description='Creates targeted practice problems',
+            instruction='''
+            Based on the weakness analysis: {weakness_analysis}
+
+            Create specific practice problems for each weak topic.
+            Design problems that progressively build mastery.
+
+            Output JSON with:
+            {{
+                "practice_problems": [
+                    {{
+                        "topic": <str>,
+                        "problems": [
+                            {{
+                                "difficulty": <str> (easy/medium/hard),
+                                "problem": <str>,
+                                "hint": <str>,
+                                "learning_goal": <str>
+                            }}
+                        ]
+                    }}
+                ]
+            }}
+            '''
+        )
+        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        agent.output_key = "practice_problems"
+        return agent
+
+    def _create_learning_strategy_agent(self) -> LlmAgent:
+        """Create specialized agent for learning strategies."""
+        from feedback_agent.custom_llm import CustomGemini
+
+        agent = LlmAgent(
+            model=CustomGemini(model=os.getenv('MODEL_NAME')),
+            name='learning_strategy_agent',
+            description='Develops personalized learning strategies',
+            instruction='''
+            Based on the weakness analysis: {weakness_analysis}
+
+            Develop a personalized learning strategy tailored to the student's weaknesses.
+            Include study schedules, learning techniques, and progress milestones.
+
+            Output JSON with:
+            {{
+                "learning_strategy": {{
+                    "study_schedule": {{
+                        "weekly_hours": <number>,
+                        "sessions_per_week": <number>,
+                        "session_duration": <str>
+                    }},
+                    "learning_techniques": [
+                        {{
+                            "technique": <str>,
+                            "when_to_use": <str>,
+                            "expected_benefit": <str>
+                        }}
+                    ],
+                    "milestones": [
+                        {{
+                            "timeline": <str>,
+                            "goal": <str>,
+                            "success_criteria": <str>
+                        }}
+                    ]
+                }}
+            }}
+            '''
+        )
+        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        agent.output_key = "learning_strategy"
+        return agent
+
+    def _create_synthesis_agent(self) -> LlmAgent:
+        """Create agent to synthesize parallel recommendations."""
+        from feedback_agent.custom_llm import CustomGemini
+
+        agent = LlmAgent(
+            model=CustomGemini(model=os.getenv('MODEL_NAME')),
+            name='recommendation_synthesizer',
+            description='Synthesizes diverse recommendations into unified plan',
+            instruction='''
+            Synthesize the following parallel recommendations into a cohesive learning plan:
+
+            Study Materials: {study_materials}
+            Practice Problems: {practice_problems}
+            Learning Strategy: {learning_strategy}
+
+            Create a unified, actionable learning plan that integrates all three aspects.
+
+            Output JSON with:
+            {{
+                "learning_objectives": [
+                    {{
+                        "objective": <str>,
+                        "resources": [<str>],
+                        "practice_activities": [<str>],
+                        "estimated_time": <str>,
+                        "priority": <str> (high/medium/low)
+                    }}
+                ],
+                "weekly_plan": {{
+                    "total_hours": <number>,
+                    "activities": [
+                        {{
+                            "day": <str>,
+                            "activity": <str>,
+                            "duration": <str>,
+                            "resources_needed": [<str>]
+                        }}
+                    ]
+                }},
+                "encouragement": <str>,
+                "success_metrics": [<str>]
+            }}
+            '''
+        )
+        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        agent.output_key = "learning_plan"
+        agent.after_agent_callback = self._log_recommendation_callback
+        return agent
 
     def _build_pipeline(self) -> SequentialAgent:
         """
-        Build the exam processing pipeline with proper state flow.
+        Build the hybrid exam processing pipeline with quality assurance and parallel recommendations.
 
-        Agent Communication Flow:
-        1. GradingAgent: Reads exam_content, answer_key from state
-                        Outputs to "grading_result" state key
-        2. AnalysisAgent: Reads {grading_result} from state
-                         Outputs to "weakness_analysis" state key
-        3. RecommendationAgent: Reads {weakness_analysis} from state
-                               Outputs to "learning_plan" state key
+        Hybrid Architecture Flow:
+        1. GradingAgent (Sequential): Reads exam_content, answer_key from state
+                                      Outputs to "grading_result" state key
+
+        2. AnalysisAgent with QA (LoopAgent): Reads {exam_content}, {grading_result} from state
+                                              Validates output quality (topics field, weaknesses structure)
+                                              Retries up to 3 times if quality insufficient
+                                              Outputs to "weakness_analysis" state key
+
+        3. Specialized Recommendations (ParallelAgent): All read {weakness_analysis} from state
+                                                        Run simultaneously for performance
+           - Study Materials Agent → "study_materials" state key
+           - Practice Problems Agent → "practice_problems" state key
+           - Learning Strategy Agent → "learning_strategy" state key
+
+        4. Synthesis Agent (Sequential): Reads {study_materials}, {practice_problems}, {learning_strategy}
+                                         Combines into unified learning plan
+                                         Outputs to "learning_plan" state key
         """
-        # Create agent instances
+        # ========================================================================
+        # STEP 1: Configure GradingAgent (Sequential)
+        # ========================================================================
         grading_agent = GradingAgent()
-        analysis_agent = AnalysisAgent()
-        recommendation_agent = RecommendationAgent()
-
-        # Configure GradingAgent
         grading_agent.agent.output_key = "grading_result"
         grading_agent.agent.after_agent_callback = self._log_grading_callback
 
-        # Update GradingAgent instruction to use state placeholders
         grading_agent.agent.instruction = """
         You are an expert grader.
 
@@ -187,11 +457,13 @@ class FeedbackSystem:
         }}
         """
 
-        # Configure AnalysisAgent
+        # ========================================================================
+        # STEP 2: Configure AnalysisAgent with LoopAgent for Quality Assurance
+        # ========================================================================
+        analysis_agent = AnalysisAgent()
         analysis_agent.agent.output_key = "weakness_analysis"
         analysis_agent.agent.after_agent_callback = self._log_analysis_callback
 
-        # Update AnalysisAgent instruction to use state placeholders
         analysis_agent.agent.instruction = """
         You are an expert educational analyst.
         Your task is to analyze a graded exam and identify the student's weak areas by identifying the CONCEPTS/TOPICS being tested, not the question text.
@@ -203,11 +475,13 @@ class FeedbackSystem:
         Your analysis process:
         STEP 1: Read each question in the ORIGINAL EXAM CONTENT
         STEP 2: For each question, identify what CONCEPT/TOPIC it is testing (e.g., "Newton's Laws", "Square Roots", "Cell Biology")
-        STEP 3: Review the GRADING RESULTS to see which questions the student got wrong
-        STEP 4: For each wrong answer, extract the CONCEPT/TOPIC (not the question text) as the weakness
+        STEP 3: Create a list of ALL topics/concepts tested in the exam (regardless of whether student got them right or wrong)
+        STEP 4: Review the GRADING RESULTS to see which questions the student got wrong
+        STEP 5: For each wrong answer, extract the CONCEPT/TOPIC (not the question text) as the weakness
 
         Output must be a JSON object with the following structure:
         {{
+            "topics": [<str>] (ALL concepts/topics tested in this exam, required field),
             "weaknesses": [
                 {{
                     "topic": <str> (the CONCEPT being tested, NOT the question text),
@@ -215,69 +489,61 @@ class FeedbackSystem:
                     "severity": <str> (low, medium, or high)
                 }}
             ],
-            "summary": <str> (overall analysis of student performance)
+            "summary": <str> (overall analysis of student performance, at least 20 characters)
         }}
 
-        CRITICAL RULES - TOPIC FIELD:
-        - The "topic" field MUST be a CONCEPT NAME, never the question text
-        - BAD: "Calculate force: mass = 10kg, acceleration = 5m/s²" (this is question text)
-        - GOOD: "Force Calculations" or "Newton's Second Law" (these are concepts)
-        - BAD: "What is the speed of light?" (this is question text)
-        - GOOD: "Speed of Light" or "Fundamental Constants" (these are concepts)
-        - BAD: "Who discovered America?" (this is question text)
-        - GOOD: "Age of Exploration" or "Historical Discoveries" (these are concepts)
+        CRITICAL RULES:
+        - The "topics" field is REQUIRED and must contain ALL concepts tested
+        - The "topic" field in weaknesses MUST be a CONCEPT NAME, never the question text
+        - Summary must be substantive (at least 20 characters)
 
         EXAMPLES:
-        Example 1:
-        Question: "Calculate the force when mass=10kg and acceleration=5m/s²"
-        Correct topic: "Force Calculations" or "Newton's Second Law"
-        WRONG topic: "Calculate the force when mass=10kg..." (don't copy the question!)
-
-        Example 2:
-        Question: "What is the square root of 16?"
-        Correct topic: "Square Roots" or "Radical Expressions"
-        WRONG topic: "What is the square root of 16?" (don't copy the question!)
-
-        Focus on identifying the underlying CONCEPTS the student struggled with, not repeating the question text.
+        BAD: "Calculate force: mass = 10kg, acceleration = 5m/s²" (this is question text)
+        GOOD: "Force Calculations" or "Newton's Second Law" (these are concepts)
         """
 
-        # Configure RecommendationAgent
-        recommendation_agent.agent.output_key = "learning_plan"
-        recommendation_agent.agent.after_agent_callback = (
-            self._log_recommendation_callback
+        # LoopAgent for quality assurance - validates analysis and retries up to 3 times
+        # Uses custom ValidationAgent that emits escalation events to control retry:
+        # - escalate=True: Stop loop (validation passed)
+        # - escalate=False: Continue loop (validation failed, retry needed)
+        validation_agent = ValidationAgent(name="analysis_validator")
+        analysis_with_qa = LoopAgent(
+            name="analysis_with_qa",
+            sub_agents=[analysis_agent.agent, validation_agent],
+            max_iterations=3
         )
 
-        # Update RecommendationAgent instruction to use state placeholders
-        recommendation_agent.agent.instruction = """
-        You are a learning advisor.
+        # ========================================================================
+        # STEP 3: Create ParallelAgent with Specialized Recommendation Agents
+        # ========================================================================
+        parallel_recommendations = ParallelAgent(
+            name="parallel_recommendations",
+            sub_agents=[
+                self._create_study_materials_agent(),
+                self._create_practice_problems_agent(),
+                self._create_learning_strategy_agent()
+            ]
+        )
 
-        Based on the weakness analysis: {weakness_analysis}
+        # ========================================================================
+        # STEP 4: Create Synthesis Agent
+        # ========================================================================
+        synthesis_agent = self._create_synthesis_agent()
 
-        Create a personalized learning plan with specific, actionable recommendations.
-
-        Output must be a JSON object with the following structure:
-        {{
-            "learning_objectives": [
-                {{
-                    "objective": <str>,
-                    "resources": [<str>],
-                    "estimated_time": <str>
-                }}
-            ],
-            "encouragement": <str>
-        }}
-        """
-
-        # Create Sequential Pipeline
+        # ========================================================================
+        # STEP 5: Assemble Hybrid Pipeline
+        # ========================================================================
         pipeline = SequentialAgent(
             name="exam_processing_pipeline",
             sub_agents=[
-                grading_agent.agent,
-                analysis_agent.agent,
-                recommendation_agent.agent,
+                grading_agent.agent,       # Sequential: Grade exam first
+                analysis_with_qa,          # Loop: Quality-assured analysis with retries
+                parallel_recommendations,  # Parallel: 3 specialized recommendation agents
+                synthesis_agent            # Sequential: Synthesize parallel outputs
             ],
         )
 
+        logger.info("✅ Hybrid pipeline built: Grading → Analysis(LoopAgent) → Parallel Recs → Synthesis")
         return pipeline
 
     async def _log_grading_callback(self, callback_context: CallbackContext) -> None:
@@ -349,7 +615,9 @@ class FeedbackSystem:
             # Save to database
             logger.info(f"Logging analysis result for exam {exam_id}")
             self.db.log_analysis(
-                exam_id=exam_id, weaknesses=analysis_result.get("weaknesses", [])
+                exam_id=exam_id,
+                weaknesses=analysis_result.get("weaknesses", []),
+                topics=analysis_result.get("topics", [])
             )
 
         except json.JSONDecodeError as e:
@@ -491,6 +759,7 @@ class FeedbackSystem:
                 if db_result["grading"]["max_score"] > 0
                 else 0,
                 "weaknesses": db_result["analysis"]["weaknesses"],
+                "topics": db_result["analysis"]["topics"],
                 "recommendations": db_result["analysis"]["recommendations"],
             }
             logger.info(f"✅ Exam processing complete for {exam_id}")
@@ -505,6 +774,7 @@ class FeedbackSystem:
                 "max_score": 0,
                 "percentage": 0.0,
                 "weaknesses": [],
+                "topics": [],
                 "recommendations": "",
             }
 
