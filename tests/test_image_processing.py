@@ -1,5 +1,5 @@
 """
-Test script for the refactored image processing agent.
+Test script for the image processing agent.
 
 This script tests multimodal support by processing exam images and extracting content.
 """
@@ -21,26 +21,25 @@ if not os.getenv("GOOGLE_API_KEY"):
 else:
     print(f"✅ API Key loaded successfully")
 
-from feedback_agent.agents.image_processing_agent import ImageProcessingAgentRefactored
+from feedback_agent.agents.image_processing_agent import ImageProcessingAgent
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
 async def test_image_processing():
-    """Test the refactored image processing agent."""
+    """Test the image processing agent."""
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🖼️  IMAGE PROCESSING AGENT TESTS")
-    print("="*80)
+    print("=" * 80)
 
     # Initialize agent
     print("\n📝 Step 1: Initializing image processing agent...")
-    agent = ImageProcessingAgentRefactored()
+    agent = ImageProcessingAgent()
     print("✅ Agent initialized\n")
 
     # Find test images
@@ -59,9 +58,9 @@ async def test_image_processing():
 
     # Process each image
     for i, image_path in enumerate(image_files[:3], 1):  # Limit to first 3 images
-        print("\n" + "-"*80)
+        print("\n" + "-" * 80)
         print(f"TEST {i}: Processing {image_path.name}")
-        print("-"*80)
+        print("-" * 80)
 
         try:
             result = await agent.process_image(image_path=str(image_path))
@@ -69,28 +68,31 @@ async def test_image_processing():
             print(f"\n✅ Image processed successfully!")
             print(f"\nExtracted Data:")
             print(f"  Subject: {result.get('subject', 'Unknown')}")
-            print(f"  Exam Content Length: {len(result.get('exam_content', ''))} characters")
+            print(
+                f"  Exam Content Length: {len(result.get('exam_content', ''))} characters"
+            )
             print(f"  Answer Key: {result.get('answer_key', 'Not found')[:50]}...")
 
             # Show first 200 chars of exam content
-            exam_content = result.get('exam_content', '')
+            exam_content = result.get("exam_content", "")
             if exam_content:
                 print(f"\n  Exam Content Preview:")
                 print(f"  {exam_content[:200]}...")
             else:
                 print(f"\n  ⚠️  No exam content extracted")
 
-            if 'error' in result:
+            if "error" in result:
                 print(f"\n  ⚠️  Warning: {result['error']}")
 
         except Exception as e:
             print(f"\n❌ Test failed with error: {e}")
             import traceback
+
             traceback.print_exc()
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ IMAGE PROCESSING TESTS COMPLETED!")
-    print("="*80)
+    print("=" * 80)
 
 
 async def test_with_sample_content():
@@ -99,9 +101,9 @@ async def test_with_sample_content():
 
     This creates a simple text-based "image" to demonstrate the concept.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("🎨 DEMO: Processing Sample Exam Content")
-    print("="*80)
+    print("=" * 80)
 
     print("\nNote: This would typically process an actual exam photo.")
     print("For demonstration, showing how the agent would process extracted text.\n")
@@ -123,14 +125,14 @@ async def test_with_sample_content():
         Q1: 4
         Q2: x = 5 ✓
         Q3: Paris
-        """
+        """,
     }
 
     print(f"Subject: {sample_result['subject']}")
     print(f"\nExam Content:")
-    print(sample_result['exam_content'])
+    print(sample_result["exam_content"])
     print(f"\nAnswer Key:")
-    print(sample_result['answer_key'])
+    print(sample_result["answer_key"])
 
     print("\n✅ This extracted content would then flow to the grading pipeline")
 

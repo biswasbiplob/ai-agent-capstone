@@ -232,7 +232,7 @@ async def demo_image_processing():
     print_section("DEMO 3: Image-Based Exam Processing")
 
     from feedback_agent.agents.image_processing_agent import (
-        ImageProcessingAgentRefactored,
+        ImageProcessingAgent,
     )
 
     print("🖼️  Looking for sample exam images...")
@@ -253,7 +253,7 @@ async def demo_image_processing():
     print(f"📸 Processing: {sample_image.name}\n")
 
     try:
-        agent = ImageProcessingAgentRefactored()
+        agent = ImageProcessingAgent()
         result = await agent.process_image(image_path=str(sample_image))
 
         print("✅ Image processed successfully!\n")

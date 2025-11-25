@@ -1,5 +1,5 @@
 """
-Test script for the refactored FeedbackSystem.
+Test script for the FeedbackSystem.
 
 This script validates that the new Runner-based implementation works correctly
 and follows ADK best practices.
@@ -26,23 +26,22 @@ from feedback_agent.agent import FeedbackSystem
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
-async def test_refactored_system():
-    """Test the refactored feedback system."""
+async def test_feedback_system():
+    """Test the FeedbackSystem."""
 
     print("\n" + "=" * 80)
-    print("Testing Refactored FeedbackSystem with ADK Runner Pattern")
+    print("Testing FeedbackSystem with ADK Runner Pattern")
     print("=" * 80 + "\n")
 
     # Initialize system with in-memory sessions for testing
     system = FeedbackSystem(
-        db_path="data/test_students_refactored.db",
-        use_memory_sessions=True  # Use memory for quick testing
+        db_path="data/test_students.db",
+        use_memory_sessions=True,  # Use memory for quick testing
     )
 
     # Test 1: Register a student
@@ -77,7 +76,7 @@ async def test_refactored_system():
             exam_content=exam_content,
             answer_key=answer_key,
             subject="General Knowledge",
-            user_id="test_user"
+            user_id="test_user",
         )
 
         print("\n✅ Exam processing complete!")
@@ -89,24 +88,36 @@ async def test_refactored_system():
         print("\n" + "-" * 80)
         print("📊 GRADING RESULT:")
         print("-" * 80)
-        if result.get('grading_result'):
-            print(result['grading_result'][:500] + "..." if len(result['grading_result']) > 500 else result['grading_result'])
+        if result.get("grading_result"):
+            print(
+                result["grading_result"][:500] + "..."
+                if len(result["grading_result"]) > 500
+                else result["grading_result"]
+            )
         else:
             print("⚠️ No grading result found")
 
         print("\n" + "-" * 80)
         print("🔍 WEAKNESS ANALYSIS:")
         print("-" * 80)
-        if result.get('weakness_analysis'):
-            print(result['weakness_analysis'][:500] + "..." if len(result['weakness_analysis']) > 500 else result['weakness_analysis'])
+        if result.get("weakness_analysis"):
+            print(
+                result["weakness_analysis"][:500] + "..."
+                if len(result["weakness_analysis"]) > 500
+                else result["weakness_analysis"]
+            )
         else:
             print("⚠️ No weakness analysis found")
 
         print("\n" + "-" * 80)
         print("📚 LEARNING PLAN:")
         print("-" * 80)
-        if result.get('learning_plan'):
-            print(result['learning_plan'][:500] + "..." if len(result['learning_plan']) > 500 else result['learning_plan'])
+        if result.get("learning_plan"):
+            print(
+                result["learning_plan"][:500] + "..."
+                if len(result["learning_plan"]) > 500
+                else result["learning_plan"]
+            )
         else:
             print("⚠️ No learning plan found")
 
@@ -117,6 +128,7 @@ async def test_refactored_system():
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -132,9 +144,9 @@ async def test_session_persistence():
 
     # Initialize with database sessions
     system = FeedbackSystem(
-        db_path="data/test_students_refactored.db",
+        db_path="data/test_students.db",
         session_db_url="sqlite:///data/test_feedback_sessions.db",
-        use_memory_sessions=False  # Use database for persistence test
+        use_memory_sessions=False,  # Use database for persistence test
     )
 
     student_id = system.register_student("Bob Smith")
@@ -148,10 +160,10 @@ async def test_session_persistence():
         exam_content=exam_content,
         answer_key=answer_key,
         subject="Math",
-        user_id="test_user_2"
+        user_id="test_user_2",
     )
 
-    exam_id = result['exam_id']
+    exam_id = result["exam_id"]
     print(f"✅ Exam {exam_id} processed")
 
     # Verify in database
@@ -165,10 +177,10 @@ async def test_session_persistence():
 
 
 if __name__ == "__main__":
-    print("\n🚀 Starting Refactored FeedbackSystem Tests\n")
+    print("\n🚀 Starting FeedbackSystem Tests\n")
 
     # Run basic test
-    success = asyncio.run(test_refactored_system())
+    success = asyncio.run(test_feedback_system())
 
     if success:
         # Run persistence test

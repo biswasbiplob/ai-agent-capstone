@@ -3,7 +3,7 @@ Comprehensive evaluation runner for the feedback agent system.
 
 This script:
 1. Loads the evaluation dataset
-2. Processes each test case through the refactored agent
+2. Processes each test case through the agent
 3. Calculates metrics
 4. Generates a detailed evaluation report
 """
@@ -11,6 +11,7 @@ This script:
 import asyncio
 import json
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,27 @@ logging.getLogger("google_genai").setLevel(logging.WARNING)
 logging.getLogger("feedback_agent").setLevel(logging.WARNING)
 
 
+# ============================================================================
+# Model Rate Limit Configuration
+# ============================================================================
+# Maps model names to minimum wait time between API calls (in seconds)
+# Formula: (60 / requests_per_minute) * 1.1 buffer
+# 10% buffer accounts for network latency and multiple agent calls per test
+# ============================================================================
+
+MODEL_RATE_LIMITS = {
+    # 15 RPM models: (60/15) * 1.1 = 4.4 → 5 seconds
+    "gemini-1.5-flash": 5,
+    "gemini-2.0-flash": 5,
+    "gemini-2.0-flash-exp": 5,
+    # 10 RPM models: (60/10) * 1.1 = 6.6 → 7 seconds
+    "gemini-2.5-flash": 7,
+    # 2 RPM models: (60/2) * 1.1 = 33 seconds
+    "gemini-1.5-pro": 33,
+    "gemini-2.5-pro": 33,
+}
+
+
 class EvaluationRunner:
     """Runs comprehensive evaluations on the feedback agent system."""
 
@@ -69,6 +91,29 @@ class EvaluationRunner:
             use_memory_sessions=True,  # Use in-memory sessions for evaluation
         )
         logger.info("Agent system initialized successfully")
+
+    def _get_rate_limit_wait_time(self) -> int:
+        """
+        Get the appropriate wait time based on MODEL_NAME environment variable.
+        Raises ValueError if MODEL_NAME is not set or unknown.
+        """
+        model_name = os.getenv("MODEL_NAME")
+
+        if not model_name:
+            raise ValueError(
+                "MODEL_NAME environment variable not set. "
+                "Set MODEL_NAME in feedback_agent/.env to run evaluations. "
+                f"Supported models: {', '.join(sorted(MODEL_RATE_LIMITS.keys()))}"
+            )
+
+        if model_name not in MODEL_RATE_LIMITS:
+            raise ValueError(
+                f"Unknown model '{model_name}'. "
+                f"Supported models: {', '.join(sorted(MODEL_RATE_LIMITS.keys()))}. "
+                "Update MODEL_NAME in feedback_agent/.env with a supported model."
+            )
+
+        return MODEL_RATE_LIMITS[model_name]
 
     def load_dataset(self) -> Dict[str, Any]:
         """Load evaluation dataset from JSON file."""
@@ -207,8 +252,18 @@ class EvaluationRunner:
 
         logger.info(f"\nStarting evaluation run with {len(test_cases)} test cases")
         logger.info(f"Timestamp: {datetime.now().isoformat()}")
+
+        wait_time = self._get_rate_limit_wait_time()
+        estimated_time_per_test = wait_time + 5  # wait + processing time
+        total_estimated_time = len(test_cases) * estimated_time_per_test
+        total_minutes = total_estimated_time // 60
+        total_seconds = total_estimated_time % 60
+        model_name = os.getenv("MODEL_NAME", "unknown")
+
         logger.info(
-            f"Note: This will take approximately {len(test_cases) * 15} seconds due to API rate limits\n"
+            f"Note: This will take approximately {total_estimated_time} seconds "
+            f"({total_minutes}m {total_seconds}s) for {len(test_cases)} test cases\n"
+            f"Model: {model_name} | Rate limit wait: {wait_time}s between tests\n"
         )
 
         results = []
@@ -220,14 +275,16 @@ class EvaluationRunner:
             result = await self.run_single_test(test_case)
             results.append(result)
 
-            # Pause between tests to respect rate limits
-            # Gemini API free tier: 15 requests per minute
-            # Conservative: 10 seconds between tests
+            # Pause between tests to respect API rate limits
+            # Wait time is dynamically determined based on MODEL_NAME
             if i < len(test_cases):
+                wait_time = self._get_rate_limit_wait_time()
+                model_name = os.getenv("MODEL_NAME", "unknown")
                 logger.info(
-                    "Waiting 10 seconds before next test (rate limit compliance)..."
+                    f"Waiting {wait_time} seconds before next test "
+                    f"(rate limit compliance for {model_name})..."
                 )
-                await asyncio.sleep(10)
+                await asyncio.sleep(wait_time)
 
         self.results = results
         return results

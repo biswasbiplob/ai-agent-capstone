@@ -1,5 +1,5 @@
 """
-Refactored ImageProcessingAgent using direct Gemini API calls with multimodal support.
+ImageProcessingAgent using direct Gemini API calls with multimodal support.
 
 This agent extracts exam content and answer keys from images using Gemini's
 vision capabilities.
@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-class ImageProcessingAgentRefactored:
+class ImageProcessingAgent:
     """
-    Refactored image processing agent using direct Gemini model calls.
+    Image processing agent using direct Gemini model calls.
 
     This agent:
     - Accepts image files (path or bytes)
@@ -39,7 +39,7 @@ class ImageProcessingAgentRefactored:
     - Returns structured JSON output
     """
 
-    INSTRUCTION = '''
+    INSTRUCTION = """
 You are an expert OCR and document analysis AI.
 Your task is to extract the content of an exam from an image.
 
@@ -58,7 +58,7 @@ Output must be a JSON object with the following structure:
 Be thorough in extracting all text from the image.
 If the subject is not stated, infer it from the content.
 If no answer key is visible, set "answer_key" to "Not found".
-'''
+"""
 
     def __init__(self, model: str = None):
         """
@@ -72,7 +72,7 @@ If no answer key is visible, set "answer_key" to "Not found".
         """
         # Get model from environment or use provided value
         if model is None:
-            model = os.getenv('MODEL_NAME')
+            model = os.getenv("MODEL_NAME")
             if not model:
                 raise ValueError(
                     "MODEL_NAME must be set in .env file. "
@@ -82,13 +82,13 @@ If no answer key is visible, set "answer_key" to "Not found".
 
         self.model_name = model
         self.model = CustomGemini(model=model)
-        logger.info(f"ImageProcessingAgentRefactored initialized with model {model}")
+        logger.info(f"ImageProcessingAgent initialized with model {model}")
 
     async def process_image(
         self,
         image_path: Optional[str] = None,
         image_bytes: Optional[bytes] = None,
-        mime_type: str = "image/jpeg"
+        mime_type: str = "image/jpeg",
     ) -> Dict[str, Any]:
         """
         Process an exam image and extract content.
@@ -115,7 +115,7 @@ If no answer key is visible, set "answer_key" to "Not found".
                 "subject": "Unknown",
                 "exam_content": "",
                 "answer_key": "Not found",
-                "error": "No image provided"
+                "error": "No image provided",
             }
 
         # Read image if path provided
@@ -130,18 +130,18 @@ If no answer key is visible, set "answer_key" to "Not found".
                     "subject": "Unknown",
                     "exam_content": "",
                     "answer_key": "Not found",
-                    "error": f"Failed to read image: {e}"
+                    "error": f"Failed to read image: {e}",
                 }
 
         # Detect MIME type from path if provided
         if image_path:
             suffix = Path(image_path).suffix.lower()
             mime_map = {
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.png': 'image/png',
-                '.gif': 'image/gif',
-                '.webp': 'image/webp'
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
             }
             mime_type = mime_map.get(suffix, mime_type)
 
@@ -149,12 +149,7 @@ If no answer key is visible, set "answer_key" to "Not found".
         parts = [
             types.Part(text=self.INSTRUCTION),
             types.Part(text="Extract the exam content from this image."),
-            types.Part(
-                inline_data=types.Blob(
-                    data=image_bytes,
-                    mime_type=mime_type
-                )
-            )
+            types.Part(inline_data=types.Blob(data=image_bytes, mime_type=mime_type)),
         ]
 
         # Call model directly with multimodal input
@@ -163,8 +158,8 @@ If no answer key is visible, set "answer_key" to "Not found".
                 model=self.model_name,
                 contents=[types.Content(role="user", parts=parts)],
                 config=types.GenerateContentConfig(
-                    response_mime_type='application/json'
-                )
+                    response_mime_type="application/json"
+                ),
             )
 
             # Extract response text
@@ -190,7 +185,7 @@ If no answer key is visible, set "answer_key" to "Not found".
                     "subject": "Unknown",
                     "exam_content": "",
                     "answer_key": "Not found",
-                    "error": "Empty response from agent"
+                    "error": "Empty response from agent",
                 }
 
         except json.JSONDecodeError as e:
@@ -198,8 +193,8 @@ If no answer key is visible, set "answer_key" to "Not found".
             logger.debug(f"Raw response: {response_text[:500]}")
             # Try to extract JSON from response
             try:
-                start = response_text.find('{')
-                end = response_text.rfind('}') + 1
+                start = response_text.find("{")
+                end = response_text.rfind("}") + 1
                 if start != -1 and end != -1:
                     json_str = response_text[start:end]
                     return json.loads(json_str)
@@ -210,7 +205,7 @@ If no answer key is visible, set "answer_key" to "Not found".
                 "subject": "Unknown",
                 "exam_content": response_text if response_text else "",
                 "answer_key": "Not found",
-                "error": "Failed to parse JSON response"
+                "error": "Failed to parse JSON response",
             }
 
         except Exception as e:
@@ -219,9 +214,9 @@ If no answer key is visible, set "answer_key" to "Not found".
                 "subject": "Unknown",
                 "exam_content": "",
                 "answer_key": "Not found",
-                "error": f"Processing failed: {e}"
+                "error": f"Processing failed: {e}",
             }
 
 
 # Create global instance for backward compatibility
-image_processor = ImageProcessingAgentRefactored()
+image_processor = ImageProcessingAgent()

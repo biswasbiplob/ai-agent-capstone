@@ -1,5 +1,5 @@
 """
-Refactored FeedbackSystem using proper ADK Runner pattern.
+FeedbackSystem using proper ADK Runner pattern.
 
 This module replaces the custom run_agent() wrapper with ADK's recommended
 Runner/SessionService pattern following the Kaggle course best practices.
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 class FeedbackSystem:
     """
-    Refactored feedback system using proper ADK Runner pattern.
+    Feedback system using proper ADK Runner pattern.
 
     Architecture:
     - Runner manages session and event flow
@@ -123,17 +123,16 @@ class FeedbackSystem:
         self.app = App(
             name="feedback_system",
             root_agent=self.pipeline,
-            plugins=self.plugins,  # Plugins go in App, not Runner
+            plugins=self.plugins,
             events_compaction_config=EventsCompactionConfig(
                 compaction_interval=5,  # Compact after 5 exam processing sessions
                 overlap_size=1,  # Keep last exam for context
             ),
         )
 
-        # Create Runner (without plugins, since they're in App)
         self.runner = Runner(app=self.app, session_service=self.session_service)
 
-        logger.info("✅ FeedbackSystemRefactored initialized with Runner pattern")
+        logger.info("✅ FeedbackSysteminitialized with Runner pattern")
 
     def _build_pipeline(self) -> SequentialAgent:
         """
