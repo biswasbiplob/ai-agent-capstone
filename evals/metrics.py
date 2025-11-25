@@ -95,16 +95,24 @@ class AnalysisQualityMetric:
         expected_weaknesses = ground_truth.get('expected_weaknesses', [])
         expected_topics = ground_truth.get('expected_topics', [])
 
-        # Extract topics from predicted weaknesses
+        # Extract topics from predicted analysis
+        # Prefer the 'topics' field if available, otherwise fall back to extracting from weaknesses
         pred_topics = set()
-        for weakness in pred_weaknesses:
-            if isinstance(weakness, dict):
-                topic = weakness.get('topic', '')
-                if topic:
-                    pred_topics.add(topic.lower())
-            elif isinstance(weakness, str):
-                # Simple string weakness
-                pred_topics.add(weakness.lower())
+        topics_list = predicted.get('topics', [])
+
+        if topics_list:
+            # Use the topics field (contains ALL topics tested, not just weaknesses)
+            pred_topics = {topic.lower() for topic in topics_list if topic}
+        else:
+            # Fallback: extract from weaknesses for backward compatibility
+            for weakness in pred_weaknesses:
+                if isinstance(weakness, dict):
+                    topic = weakness.get('topic', '')
+                    if topic:
+                        pred_topics.add(topic.lower())
+                elif isinstance(weakness, str):
+                    # Simple string weakness
+                    pred_topics.add(weakness.lower())
 
         # Expected topics (normalized)
         expected_topics_set = {t.lower() for t in expected_topics}

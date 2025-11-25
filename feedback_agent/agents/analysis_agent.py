@@ -42,11 +42,13 @@ class AnalysisAgent:
             Your analysis process:
             STEP 1: Read each question in the ORIGINAL EXAM CONTENT
             STEP 2: For each question, identify what CONCEPT/TOPIC it is testing (e.g., "Newton's Laws", "Square Roots", "Cell Biology")
-            STEP 3: Review the GRADED EXAM DATA to see which questions the student got wrong
-            STEP 4: For each wrong answer, extract the CONCEPT/TOPIC (not the question text) as the weakness
+            STEP 3: Create a list of ALL topics/concepts tested in the exam (regardless of whether student got them right or wrong)
+            STEP 4: Review the GRADED EXAM DATA to see which questions the student got wrong
+            STEP 5: For each wrong answer, extract the CONCEPT/TOPIC (not the question text) as the weakness
 
             Output must be a JSON object with the following structure:
             {
+                "topics": [<str>] (ALL concepts/topics tested in this exam, even if student got them correct),
                 "weaknesses": [
                     {
                         "topic": <str> (the CONCEPT being tested, NOT the question text),
@@ -68,19 +70,59 @@ class AnalysisAgent:
 
             EXAMPLES:
             Example 1:
-            Question: "Calculate the force when mass=10kg and acceleration=5m/s²"
-            Correct topic: "Force Calculations" or "Newton's Second Law"
-            WRONG topic: "Calculate the force when mass=10kg..." (don't copy the question!)
+            Exam has 3 questions: Force calculation (wrong), Speed of light (correct), Kinetic energy (correct)
+            Output:
+            {
+                "topics": ["Force Calculations", "Speed of Light", "Kinetic Energy"],
+                "weaknesses": [{
+                    "topic": "Force Calculations",
+                    "description": "Student made calculation error",
+                    "severity": "medium"
+                }],
+                "summary": "Strong understanding of physics concepts, minor calculation error"
+            }
 
             Example 2:
             Question: "What is the square root of 16?"
             Correct topic: "Square Roots" or "Radical Expressions"
             WRONG topic: "What is the square root of 16?" (don't copy the question!)
 
-            Focus on identifying the underlying CONCEPTS the student struggled with, not repeating the question text.
+            CRITICAL: The "topics" list must include ALL concepts tested, not just the ones with errors.
+            Focus on identifying the underlying CONCEPTS the student was tested on, not repeating the question text.
             '''
         )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+
+        # Define JSON schema to enforce structure
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "topics": types.Schema(
+                    type=types.Type.ARRAY,
+                    description="ALL concepts/topics tested in this exam (required, even if empty)",
+                    items=types.Schema(type=types.Type.STRING)
+                ),
+                "weaknesses": types.Schema(
+                    type=types.Type.ARRAY,
+                    description="Student weaknesses (empty if perfect score)",
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "topic": types.Schema(type=types.Type.STRING, description="Concept being tested"),
+                            "description": types.Schema(type=types.Type.STRING, description="What student got wrong"),
+                            "severity": types.Schema(type=types.Type.STRING, description="low, medium, or high")
+                        },
+                        required=["topic", "description", "severity"]
+                    )
+                ),
+                "summary": types.Schema(type=types.Type.STRING, description="Overall analysis")
+            },
+            required=["topics", "weaknesses", "summary"]
+        )
+
+        self.agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema
+        )
 
     def analyze_performance(
         self,
@@ -132,6 +174,14 @@ class AnalysisAgent:
             if start != -1 and end != -1:
                 json_str = text[start:end]
                 result = json.loads(json_str)
+
+                # Ensure topics field exists (even if empty)
+                if "topics" not in result:
+                    result["topics"] = []
+
+                # Normalize topics to ensure consistent structure (list of strings)
+                if isinstance(result["topics"], list):
+                    result["topics"] = [str(topic) for topic in result["topics"]]
 
                 # Normalize weaknesses to ensure consistent structure
                 if "weaknesses" in result:

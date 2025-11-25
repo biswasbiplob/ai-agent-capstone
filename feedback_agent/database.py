@@ -34,15 +34,22 @@ class StudentDatabase:
         ''')
         
         # Results/Weaknesses table
-        # Storing weaknesses as a JSON string for simplicity in this iteration
+        # Storing weaknesses and topics as JSON strings for simplicity in this iteration
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS analysis (
                 exam_id TEXT PRIMARY KEY,
                 weaknesses TEXT,
+                topics TEXT,
                 recommendations TEXT,
                 FOREIGN KEY (exam_id) REFERENCES exams (id)
             )
         ''')
+
+        # Migration: Add topics column if it doesn't exist
+        cursor.execute("PRAGMA table_info(analysis)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'topics' not in columns:
+            cursor.execute('ALTER TABLE analysis ADD COLUMN topics TEXT')
         
         conn.commit()
         conn.close()
@@ -65,29 +72,30 @@ class StudentDatabase:
         conn.commit()
         conn.close()
 
-    def log_analysis(self, exam_id: str, weaknesses: Optional[List[str]] = None, recommendations: Optional[str] = None):
+    def log_analysis(self, exam_id: str, weaknesses: Optional[List[str]] = None, topics: Optional[List[str]] = None, recommendations: Optional[str] = None):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
+
             # Check if record exists to decide whether to insert or update specific fields
-            cursor.execute('SELECT weaknesses, recommendations FROM analysis WHERE exam_id = ?', (exam_id,))
+            cursor.execute('SELECT weaknesses, topics, recommendations FROM analysis WHERE exam_id = ?', (exam_id,))
             row = cursor.fetchone()
-            
+
             if row:
-                current_weaknesses, current_recommendations = row
+                current_weaknesses, current_topics, current_recommendations = row
                 new_weaknesses = json.dumps(weaknesses) if weaknesses is not None else current_weaknesses
+                new_topics = json.dumps(topics) if topics is not None else current_topics
                 new_recommendations = recommendations if recommendations is not None else current_recommendations
-                
+
                 cursor.execute('''
-                    UPDATE analysis 
-                    SET weaknesses = ?, recommendations = ?
+                    UPDATE analysis
+                    SET weaknesses = ?, topics = ?, recommendations = ?
                     WHERE exam_id = ?
-                ''', (new_weaknesses, new_recommendations, exam_id))
+                ''', (new_weaknesses, new_topics, new_recommendations, exam_id))
             else:
                 cursor.execute('''
-                    INSERT INTO analysis (exam_id, weaknesses, recommendations)
-                    VALUES (?, ?, ?)
-                ''', (exam_id, json.dumps(weaknesses or []), recommendations or ""))
+                    INSERT INTO analysis (exam_id, weaknesses, topics, recommendations)
+                    VALUES (?, ?, ?, ?)
+                ''', (exam_id, json.dumps(weaknesses or []), json.dumps(topics or []), recommendations or ""))
             conn.commit()
 
     def get_student_history(self, student_id: str) -> List[Dict]:
@@ -118,7 +126,7 @@ class StudentDatabase:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT e.total_score, e.max_score, a.weaknesses, a.recommendations
+            SELECT e.total_score, e.max_score, a.weaknesses, a.topics, a.recommendations
             FROM exams e
             LEFT JOIN analysis a ON e.id = a.exam_id
             WHERE e.id = ?
@@ -134,6 +142,7 @@ class StudentDatabase:
                 },
                 'analysis': {
                     'weaknesses': json.loads(row['weaknesses']) if row['weaknesses'] else [],
+                    'topics': json.loads(row['topics']) if row['topics'] else [],
                     'recommendations': row['recommendations'] # This is a string (JSON or text)
                 }
             }
