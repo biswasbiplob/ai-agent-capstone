@@ -62,6 +62,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def fix_json_string(json_str: str) -> str:
+    """
+    Fix common JSON formatting issues.
+
+    Handles:
+    - Trailing commas before closing braces/brackets
+    - Multiple consecutive commas
+
+    Args:
+        json_str: Potentially malformed JSON string
+
+    Returns:
+        Fixed JSON string
+    """
+    import re
+
+    # Remove trailing commas before closing braces/brackets
+    # Pattern: comma followed by optional whitespace and then } or ]
+    json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+
+    # Remove multiple consecutive commas (rare but possible)
+    json_str = re.sub(r',\s*,', r',', json_str)
+
+    return json_str
+
+
 class ValidationAgent(BaseAgent):
     """
     Custom validation agent for LoopAgent quality assurance.
@@ -101,8 +127,21 @@ class ValidationAgent(BaseAgent):
 
             # Check 1: Topics field exists and has at least one topic
             topics = analysis.get("topics", [])
+            weaknesses = analysis.get("weaknesses", [])
+
             if not topics or len(topics) == 0:
-                logger.warning(f"❌ Validation failed: Topics field is empty")
+                # Provide detailed feedback to help the model improve
+                if weaknesses:
+                    logger.warning(
+                        f"❌ Validation failed: Topics field is empty but {len(weaknesses)} "
+                        f"weaknesses were identified. Topics MUST list ALL concepts tested in the exam, "
+                        f"not just areas where student struggled."
+                    )
+                else:
+                    logger.warning(
+                        f"❌ Validation failed: Topics field is empty. Must list ALL concepts/subjects "
+                        f"tested in the exam (e.g., 'Basic Arithmetic', 'Algebra', 'Biology')."
+                    )
                 yield Event(
                     author=self.name,
                     actions=EventActions(escalate=False)  # Continue loop to retry
@@ -110,7 +149,6 @@ class ValidationAgent(BaseAgent):
                 return
 
             # Check 2: Weaknesses structure is valid
-            weaknesses = analysis.get("weaknesses", [])
             if isinstance(weaknesses, list):
                 for w in weaknesses:
                     if not isinstance(w, dict) or "topic" not in w:
@@ -118,6 +156,19 @@ class ValidationAgent(BaseAgent):
                         yield Event(
                             author=self.name,
                             actions=EventActions(escalate=False)  # Continue loop to retry
+                        )
+                        return
+
+                    # Check that weakness topics are concept names, not question text
+                    topic = w.get("topic", "")
+                    if len(topic) > 100 or "?" in topic or topic.startswith("Calculate"):
+                        logger.warning(
+                            f"❌ Validation failed: Weakness topic appears to be question text "
+                            f"instead of concept name: '{topic[:50]}...'"
+                        )
+                        yield Event(
+                            author=self.name,
+                            actions=EventActions(escalate=False)
                         )
                         return
 
@@ -438,12 +489,29 @@ class FeedbackSystem:
         Exam content: {exam_content}
         Answer key: {answer_key}
 
-        Compare the student's answers with the correct answers and calculate the score.
+        GRADING PROCESS:
+        1. Compare each student answer with the corresponding correct answer
+        2. Mark each question as correct (is_correct: true) or incorrect (is_correct: false)
+        3. Calculate scores:
+           - Count how many questions are marked as correct
+           - Count total number of questions
+           - total_score = number of correct answers
+           - max_score = total number of questions
+        4. VERIFY your calculation: Count the "is_correct: true" values in corrections array and ensure it matches total_score
+
+        CRITICAL RULES:
+        - total_score MUST equal the count of is_correct: true in corrections array
+        - max_score MUST equal the total number of questions in corrections array
+        - Double-check your arithmetic before outputting
+
+        EXAMPLE:
+        If corrections has 4 items with is_correct values: [true, false, true, false]
+        Then: total_score = 2 (two trues), max_score = 4 (four questions total)
 
         Output must be a JSON object with the following structure:
         {{
-            "total_score": <number>,
-            "max_score": <number>,
+            "total_score": <number> (count of correct answers),
+            "max_score": <number> (total number of questions),
             "corrections": [
                 {{
                     "question": <str>,
@@ -497,12 +565,69 @@ class FeedbackSystem:
         - The "topic" field in weaknesses MUST be a CONCEPT NAME, never the question text
         - Summary must be substantive (at least 20 characters)
 
-        EXAMPLES:
-        BAD: "Calculate force: mass = 10kg, acceleration = 5m/s²" (this is question text)
-        GOOD: "Force Calculations" or "Newton's Second Law" (these are concepts)
+        TOPIC EXTRACTION EXAMPLES:
+
+        EXAMPLE 1 - Perfect Score:
+        Exam has 4 questions: 2 on addition, 2 on subtraction. Student gets all correct.
+        Expected output:
+        {{
+            "topics": ["Addition", "Subtraction"],  // ALL concepts tested
+            "weaknesses": [],  // No weaknesses since perfect score
+            "summary": "Student demonstrates strong mastery of basic arithmetic operations."
+        }}
+
+        EXAMPLE 2 - Mixed Performance:
+        Exam has 4 questions: 3 chemistry (all correct), 1 astronomy (incorrect).
+        Expected output:
+        {{
+            "topics": ["Chemistry", "Astronomy"],  // ALL concepts tested, not just failures
+            "weaknesses": [
+                {{
+                    "topic": "Astronomy",  // Concept name, not question text
+                    "description": "Student incorrectly identified the planet with the most moons",
+                    "severity": "medium"
+                }}
+            ],
+            "summary": "Student shows strong chemistry knowledge but needs work on astronomy concepts."
+        }}
+
+        EXAMPLE 3 - Multiple Topics with Multiple Weaknesses:
+        Exam has 6 questions: 2 on physics (1 correct, 1 wrong), 2 on biology (both wrong), 2 on chemistry (both correct).
+        Expected output:
+        {{
+            "topics": ["Physics", "Biology", "Chemistry"],  // ALL three subjects tested
+            "weaknesses": [
+                {{
+                    "topic": "Force Calculations",  // Physics concept, not question text
+                    "description": "Student did not apply Newton's Second Law correctly",
+                    "severity": "high"
+                }},
+                {{
+                    "topic": "Cell Structure",  // Biology concept
+                    "description": "Student confused mitochondria function with nucleus function",
+                    "severity": "high"
+                }},
+                {{
+                    "topic": "Photosynthesis",  // Another biology concept
+                    "description": "Student did not identify the correct products of photosynthesis",
+                    "severity": "medium"
+                }}
+            ],
+            "summary": "Student needs significant work on biology and physics concepts, but demonstrates good chemistry understanding."
+        }}
+
+        BAD EXAMPLES (DO NOT DO THIS):
+        ❌ "Calculate force: mass = 10kg, acceleration = 5m/s²" (this is question text, not a concept)
+        ❌ "What is the capital of France?" (this is question text)
+        ❌ "Solve for x: 2x + 3 = 7" (this is question text)
+
+        GOOD EXAMPLES (DO THIS):
+        ✅ "Force Calculations" or "Newton's Second Law"
+        ✅ "European Geography" or "Capital Cities"
+        ✅ "Linear Equations" or "Algebraic Problem Solving"
         """
 
-        # LoopAgent for quality assurance - validates analysis and retries up to 3 times
+        # LoopAgent for quality assurance - validates analysis and retries up to 5 times
         # Uses custom ValidationAgent that emits escalation events to control retry:
         # - escalate=True: Stop loop (validation passed)
         # - escalate=False: Continue loop (validation failed, retry needed)
@@ -510,7 +635,7 @@ class FeedbackSystem:
         analysis_with_qa = LoopAgent(
             name="analysis_with_qa",
             sub_agents=[analysis_agent.agent, validation_agent],
-            max_iterations=3
+            max_iterations=5
         )
 
         # ========================================================================
@@ -641,8 +766,16 @@ class FeedbackSystem:
                 logger.error("No learning_plan in state")
                 return
 
+            # Fix common JSON issues before parsing
+            fixed_json_str = fix_json_string(recommendation_result_str)
+
             # Parse JSON result
-            recommendation_result = json.loads(recommendation_result_str)
+            try:
+                recommendation_result = json.loads(fixed_json_str)
+            except json.JSONDecodeError:
+                # If fixing didn't work, try original
+                logger.warning("JSON fixing failed, trying original string")
+                recommendation_result = json.loads(recommendation_result_str)
 
             # Get exam_id from state
             exam_id = callback_context.state.get("exam_id")
@@ -875,6 +1008,33 @@ class FeedbackSystem:
             Dictionary mapping subjects to mastery metrics
         """
         return self.memory.get_mastery_progress(student_id)
+
+
+# =============================================================================
+# SINGLETON ACCESSOR FOR CONVERSATIONAL TOOLS
+# =============================================================================
+
+_feedback_system_instance: Optional[FeedbackSystem] = None
+
+
+def get_feedback_system() -> FeedbackSystem:
+    """
+    Get or create global FeedbackSystem instance for tool use.
+
+    This singleton pattern ensures all conversational tools share the same
+    FeedbackSystem instance, maintaining consistent database and session state.
+
+    Returns:
+        FeedbackSystem: The global feedback system instance
+    """
+    global _feedback_system_instance
+    if _feedback_system_instance is None:
+        _feedback_system_instance = FeedbackSystem(
+            enable_logging_plugin=False,  # Disable verbose logging for conversational use
+            use_memory_sessions=True,  # Use InMemorySessionService (ADK Web UI manages its own sessions)
+        )
+        logger.info("Created global FeedbackSystem instance for conversational tools")
+    return _feedback_system_instance
 
 
 # Create conversational wrapper for ADK web
