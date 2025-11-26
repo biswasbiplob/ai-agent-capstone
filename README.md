@@ -4,11 +4,18 @@ LearnPath Agent automates the entire exam feedback lifecycle, from grading and w
 
 ```mermaid
 graph TD
+    subgraph ConversationalAgent["ConversationalAgent (ADK Web UI)"]
+        CA["LlmAgent"]
+        Tools["8 Tools"]
+    end
+
     subgraph FeedbackSystem["FeedbackSystem (ADK Runner)"]
         GA["GradingAgent"]
         subgraph LoopAgent["LoopAgent (QA)"]
             AA["AnalysisAgent"]
             VA["ValidationAgent"]
+            AA --> VA
+            VA -.->|retry| AA
         end
         subgraph ParallelAgent["ParallelAgent"]
             SM["Study Materials Agent"]
@@ -17,6 +24,9 @@ graph TD
         end
         SA["Synthesis Agent"]
     end
+
+    User["User (Teacher/Student)"] --> ConversationalAgent
+    ConversationalAgent --> FeedbackSystem
 
     Input["Exam Input"] --> GA
     GA --> LoopAgent
@@ -274,6 +284,62 @@ Cross-session tracking for long-term learning analytics:
 - **Learning Velocity**: Measures improvement rate per topic over time
 - **Mastery Progress**: Tracks which subjects are improving vs. stagnating
 - **Spaced Repetition**: Recommends topics for review based on recurrence
+
+---
+
+## Conversational Interface (ADK Web UI)
+
+LearnPath Agent includes a conversational interface accessible via ADK Web UI. This provides a natural language interface for teachers and students to interact with the system.
+
+### Starting the Interface
+
+```bash
+cd feedback_agent
+adk web
+```
+
+Then open `http://localhost:8000` in your browser.
+
+### Available Tools (8 Total)
+
+The conversational agent exposes 8 tools for interacting with the FeedbackSystem:
+
+| Tool | Role | Description |
+|------|------|-------------|
+| `authenticate_user` | All | Login with name and role (teacher/student) |
+| `process_exam_from_image` | Teacher | Grade an exam from an uploaded image |
+| `process_exam_from_text` | Teacher | Grade an exam from text content |
+| `get_my_results` | All | View your own exam results |
+| `get_student_results` | Teacher | View any student's exam results |
+| `get_class_analytics` | Teacher | View class-wide statistics |
+| `list_students` | Teacher | List all registered students |
+| `get_learning_recommendations` | All | Get personalized learning recommendations |
+
+### Image Upload Support
+
+The conversational interface supports multiple image sources:
+
+1. **ADK Web UI Upload**: Drag and drop images directly into the chat
+2. **URL**: Provide a public URL to an image
+3. **Local Path**: Provide a local file path (when running locally)
+
+### Example Conversation
+
+```
+User: Hi, I'm Ms. Johnson, a teacher
+Agent: [authenticates user as teacher]
+       Welcome, Ms. Johnson! As a teacher, you can grade exams, view student results, and see class analytics.
+
+User: [uploads exam image] Grade this exam for Alice in Mathematics
+Agent: [processes image, extracts content, grades exam]
+       Alice scored 8/10 (80%) on the Mathematics exam.
+
+       Areas for Improvement:
+       - Quadratic Equations (medium severity)
+       - Factorization (low severity)
+
+       I've generated a personalized learning plan for Alice.
+```
 
 ---
 

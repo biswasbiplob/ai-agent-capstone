@@ -1,8 +1,8 @@
 # System Architecture
 
-**Project**: AI Agent Capstone - Student-Teacher Exam Correction System
-**Version**: 1.0
-**Last Updated**: 2025-11-24
+**Project**: AI Agent Capstone - LearnPath Agent (Exam Correction System)
+**Version**: 2.0
+**Last Updated**: 2025-11-26
 
 ---
 
@@ -13,13 +13,14 @@
 3. [High-Level Architecture](#high-level-architecture)
 4. [Core Components](#core-components)
 5. [Agent Pipeline](#agent-pipeline)
-6. [Data Flow](#data-flow)
-7. [Authentication & Authorization](#authentication--authorization)
-8. [Observability](#observability)
-9. [Evaluation Framework](#evaluation-framework)
-10. [Technology Stack](#technology-stack)
-11. [Design Decisions](#design-decisions)
-12. [Future Enhancements](#future-enhancements)
+6. [Conversational Interface](#conversational-interface)
+7. [Data Flow](#data-flow)
+8. [Authentication & Authorization](#authentication--authorization)
+9. [Observability](#observability)
+10. [Evaluation Framework](#evaluation-framework)
+11. [Technology Stack](#technology-stack)
+12. [Design Decisions](#design-decisions)
+13. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -58,7 +59,12 @@ Every architectural decision follows Google ADK patterns:
 Each component has a single, well-defined responsibility:
 - **GradingAgent**: Exam scoring only
 - **AnalysisAgent**: Weakness identification only
-- **RecommendationAgent**: Learning plan creation only
+- **ValidationAgent**: Quality assurance only
+- **ParallelAgent**: Concurrent recommendation generation
+  - **Study Materials Agent**: Learning resources only
+  - **Practice Problems Agent**: Exercise generation only
+  - **Learning Strategy Agent**: Study techniques only
+- **SynthesisAgent**: Unified learning plan creation only
 - **Database**: Persistence only
 - **Plugins**: Metrics and logging only
 
@@ -81,58 +87,91 @@ All I/O operations use async/await:
 
 ## High-Level Architecture
 
+```mermaid
+graph TD
+    subgraph ConversationalAgent["ConversationalAgent (ADK Web UI)"]
+        CA["LlmAgent"]
+        Tools["8 Tools"]
+    end
+
+    subgraph FeedbackSystem["FeedbackSystem (ADK Runner)"]
+        GA["GradingAgent"]
+        subgraph LoopAgent["LoopAgent (QA)"]
+            AA["AnalysisAgent"]
+            VA["ValidationAgent"]
+            AA --> VA
+            VA -.->|retry| AA
+        end
+        subgraph ParallelAgent["ParallelAgent"]
+            SM["Study Materials Agent"]
+            PP["Practice Problems Agent"]
+            LS["Learning Strategy Agent"]
+        end
+        SA["Synthesis Agent"]
+    end
+
+    User["User (Teacher/Student)"] --> ConversationalAgent
+    ConversationalAgent --> FeedbackSystem
+
+    Input["Exam Input"] --> GA
+    GA --> LoopAgent
+    LoopAgent --> ParallelAgent
+    ParallelAgent --> SA
+    SA --> Output["Learning Plan"]
+
+    DB[(StudentDatabase)]
+    MEM[(MemoryService)]
+    GA --> DB
+    AA --> DB
+    SA --> DB
+    SA --> MEM
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    FeedbackSystem                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                      Runner                          │   │
-│  │  ┌───────────────────────────────────────────────┐  │   │
-│  │  │              App                               │  │   │
-│  │  │  ┌─────────────────────────────────────────┐  │  │   │
-│  │  │  │   Sequential Agent Pipeline             │  │  │   │
-│  │  │  │   ┌──────────────────────────────────┐  │  │  │   │
-│  │  │  │   │  1. GradingAgent                │  │  │  │   │
-│  │  │  │   │     output_key: grading_result   │  │  │  │   │
-│  │  │  │   └──────────────────────────────────┘  │  │  │   │
-│  │  │  │   ┌──────────────────────────────────┐  │  │  │   │
-│  │  │  │   │  2. AnalysisAgent               │  │  │  │   │
-│  │  │  │   │     reads: {grading_result}      │  │  │  │   │
-│  │  │  │   │     output_key: weakness_analysis│  │  │  │   │
-│  │  │  │   └──────────────────────────────────┘  │  │  │   │
-│  │  │  │   ┌──────────────────────────────────┐  │  │  │   │
-│  │  │  │   │  3. RecommendationAgent         │  │  │  │   │
-│  │  │  │   │     reads: {weakness_analysis}   │  │  │  │   │
-│  │  │  │   │     output_key: learning_plan    │  │  │  │   │
-│  │  │  │   └──────────────────────────────────┘  │  │  │   │
-│  │  │  └─────────────────────────────────────────┘  │  │   │
-│  │  │  │                                             │  │   │
-│  │  │  │   Plugins:                                  │  │   │
-│  │  │  │   - LoggingPlugin (ADK built-in)           │  │   │
-│  │  │  │   - ExamMetricsPlugin (custom)             │  │   │
-│  │  │  └─────────────────────────────────────────────┘  │   │
-│  │  └───────────────────────────────────────────────────┘   │
-│  │                                                            │
-│  │   SessionService (DatabaseSessionService)                │
-│  │   - SQLite persistence                                    │
-│  │   - State management                                      │
-│  │   - Events storage                                        │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                               │
-│   StudentDatabase (SQLite)                                   │
-│   - Students, Exams, Analysis tables                         │
-│   - Performance tracking                                     │
-└───────────────────────────────────────────────────────────────┘
+
+### Component Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        FeedbackSystem                                 │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                          Runner                                 │  │
+│  │  ┌──────────────────────────────────────────────────────────┐  │  │
+│  │  │               Hybrid Agent Pipeline                       │  │  │
+│  │  │                                                           │  │  │
+│  │  │   1. GradingAgent (Sequential)                           │  │  │
+│  │  │      output_key: grading_result                          │  │  │
+│  │  │                     ↓                                     │  │  │
+│  │  │   2. LoopAgent (Quality Assurance)                       │  │  │
+│  │  │      ┌─────────────────────────────────────┐             │  │  │
+│  │  │      │ AnalysisAgent → ValidationAgent    │             │  │  │
+│  │  │      │ (retry up to 5x if validation fails)│             │  │  │
+│  │  │      └─────────────────────────────────────┘             │  │  │
+│  │  │      output_key: weakness_analysis                       │  │  │
+│  │  │                     ↓                                     │  │  │
+│  │  │   3. ParallelAgent (3 Recommenders)                      │  │  │
+│  │  │      ┌──────────┬──────────┬──────────┐                  │  │  │
+│  │  │      │ Study    │ Practice │ Learning │                  │  │  │
+│  │  │      │ Materials│ Problems │ Strategy │                  │  │  │
+│  │  │      └──────────┴──────────┴──────────┘                  │  │  │
+│  │  │                     ↓                                     │  │  │
+│  │  │   4. SynthesisAgent                                      │  │  │
+│  │  │      output_key: learning_plan                           │  │  │
+│  │  │                                                           │  │  │
+│  │  └──────────────────────────────────────────────────────────┘  │  │
+│  │                                                                 │  │
+│  │   Plugins:                                                      │  │
+│  │   - LoggingPlugin (ADK built-in)                               │  │
+│  │   - ExamMetricsPlugin (custom domain metrics)                  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│   SessionService (DatabaseSessionService or InMemorySessionService)  │
+│   StudentDatabase (SQLite) + MemoryService (cross-session tracking)  │
+└──────────────────────────────────────────────────────────────────────┘
 
 External Systems:
-┌─────────────────┐
-│  Google Gemini  │ ← LLM Backend
-│  API (2.0-flash)│
-└─────────────────┘
-
-┌─────────────────┐
-│  exam_metrics   │ ← Metrics Storage
-│  .jsonl         │
-└─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│  Google Gemini  │    │  ADK Web UI     │
+│  API (1.5-flash)│    │  (localhost:8000)│
+└─────────────────┘    └─────────────────┘
 ```
 
 ---
@@ -185,7 +224,19 @@ get_metrics_summary() -> dict
 
 **Callback**: `_log_grading_callback` - Saves scores to database
 
-#### AnalysisAgent
+#### LoopAgent (Quality Assurance)
+
+**Location**: `feedback_agent/agent.py`
+
+**Purpose**: Ensure high-quality analysis through validation and retry
+
+**Contains**:
+- **AnalysisAgent**: Identifies conceptual weaknesses
+- **ValidationAgent**: Validates analysis quality
+
+**Max Iterations**: 5 (retries until validation passes)
+
+##### AnalysisAgent
 
 **Location**: `feedback_agent/agents/analysis_agent.py`
 
@@ -197,7 +248,7 @@ get_metrics_summary() -> dict
 
 **Output**:
 - `output_key`: "weakness_analysis"
-- Format: JSON with weaknesses (topic, description, severity), summary
+- Format: JSON with weaknesses (topic, description, severity), topics, summary
 
 **Critical Feature**: Extracts underlying CONCEPTS, not question text
 - ✅ "Newton's Second Law" (concept)
@@ -205,24 +256,84 @@ get_metrics_summary() -> dict
 
 **Callback**: `_log_analysis_callback` - Saves weaknesses to database
 
-#### RecommendationAgent
+##### ValidationAgent
 
-**Location**: `feedback_agent/agents/recommendation_agent.py`
+**Location**: `feedback_agent/agent.py`
 
-**Purpose**: Create personalized learning plans
+**Purpose**: Validate analysis quality before proceeding
+
+**Validation Checks**:
+- `topics` field exists and is non-empty
+- Weaknesses contain concept names, not question text
+- Summary is substantive (>20 characters)
+
+**Behavior**:
+- If validation fails: Returns without escalate (triggers retry)
+- If validation passes: Yields `Event(actions=EventActions(escalate=True))`
+
+```python
+class ValidationAgent(BaseAgent):
+    async def _run_async_impl(self, ctx):
+        analysis = ctx.session.state.get("weakness_analysis", {})
+
+        # Validate topics field
+        if not analysis.get("topics"):
+            return  # Causes retry
+
+        # Validation passed - escalate to proceed
+        yield Event(actions=EventActions(escalate=True))
+```
+
+#### ParallelAgent (Recommendations)
+
+**Location**: `feedback_agent/agent.py`
+
+**Purpose**: Generate comprehensive recommendations efficiently
+
+**Contains 3 specialized agents running concurrently**:
+
+##### Study Materials Agent
+- **Purpose**: Curate relevant learning resources
+- **Output**: Textbooks, videos, articles matched to weaknesses
+- **output_key**: "study_materials"
+
+##### Practice Problems Agent
+- **Purpose**: Generate targeted practice exercises
+- **Output**: Problems addressing specific weak concepts
+- **output_key**: "practice_problems"
+
+##### Learning Strategy Agent
+- **Purpose**: Develop personalized study techniques
+- **Output**: Time management, review schedules
+- **output_key**: "learning_strategy"
+
+**Benefit**: All three agents execute simultaneously, reducing total processing time
+
+#### SynthesisAgent
+
+**Location**: `feedback_agent/agent.py`
+
+**Purpose**: Combine parallel outputs into unified learning plan
 
 **Input**:
-- `{weakness_analysis}`: Analysis output from previous agent
+- `{study_materials}`: From Study Materials Agent
+- `{practice_problems}`: From Practice Problems Agent
+- `{learning_strategy}`: From Learning Strategy Agent
+- `{weakness_analysis}`: From LoopAgent
 
 **Output**:
 - `output_key`: "learning_plan"
-- Format: JSON with learning_objectives, resources, encouragement
+- Format: JSON with learning_objectives, weekly_schedule, resources, success_metrics
 
-**Callback**: `_log_recommendation_callback` - Saves recommendations to database
+**Callback**: `_log_recommendation_callback` - Saves combined recommendations to database
 
 ### 3. SessionService
 
-**Implementation**: `DatabaseSessionService` (SQLite)
+**Two Implementations Based on Context**:
+
+#### DatabaseSessionService (SQLite) - Exam Processing Pipeline
+
+**Used by**: `FeedbackSystem` for exam grading and analysis
 
 **Responsibilities**:
 - Persist session state across invocations
@@ -242,7 +353,20 @@ sessions(
 )
 ```
 
-**Alternative**: `InMemorySessionService` (testing only)
+#### InMemorySessionService - Conversational Interface
+
+**Used by**: `get_feedback_system()` singleton for ADK Web UI
+
+**Why InMemorySessionService for Conversational Tools**:
+- Avoids async SQLite driver conflicts in ADK Web UI context
+- Simpler state management for conversational flow
+- Each conversation is independent (no persistence needed)
+
+```python
+def get_feedback_system() -> FeedbackSystem:
+    """Singleton for conversational tools - uses InMemorySessionService."""
+    return FeedbackSystem(use_memory_sessions=True)
+```
 
 ### 4. Database Layer
 
@@ -327,34 +451,43 @@ Initial State:
         │          answer_key   │
         └───────────────────────┘
                     ↓
-State Update:
-{
-    ...(previous state),
-    "grading_result": "{\"total_score\": 8, \"max_score\": 10, ...}"
-}
+State Update: + "grading_result"
+                    ↓
+        ┌───────────────────────────────────────┐
+        │   LoopAgent (max 5 iterations)        │
+        │   ┌─────────────────────────────┐     │
+        │   │ AnalysisAgent               │     │
+        │   │ reads: exam_content,        │     │
+        │   │        grading_result       │     │
+        │   └─────────────────────────────┘     │
+        │                 ↓                     │
+        │   ┌─────────────────────────────┐     │
+        │   │ ValidationAgent             │     │
+        │   │ checks: topics field,       │     │
+        │   │         weakness quality    │     │
+        │   │ fail → retry, pass → escalate    │
+        │   └─────────────────────────────┘     │
+        └───────────────────────────────────────┘
+                    ↓
+State Update: + "weakness_analysis"
+                    ↓
+        ┌───────────────────────────────────────┐
+        │   ParallelAgent (concurrent)          │
+        │   ┌─────────┬─────────┬─────────┐    │
+        │   │ Study   │Practice │Learning │    │
+        │   │Materials│Problems │Strategy │    │
+        │   └─────────┴─────────┴─────────┘    │
+        └───────────────────────────────────────┘
+                    ↓
+State Update: + "study_materials", "practice_problems", "learning_strategy"
                     ↓
         ┌───────────────────────┐
-        │   AnalysisAgent       │
-        │   reads: exam_content │
-        │          grading_result
+        │   SynthesisAgent      │
+        │   reads: all parallel │
+        │          outputs      │
         └───────────────────────┘
                     ↓
-State Update:
-{
-    ...(previous state),
-    "weakness_analysis": "{\"weaknesses\": [{\"topic\": \"Subtraction\", ...}], ...}"
-}
-                    ↓
-        ┌───────────────────────┐
-        │ RecommendationAgent   │
-        │ reads: weakness_analysis
-        └───────────────────────┘
-                    ↓
-Final State:
-{
-    ...(previous state),
-    "learning_plan": "{\"learning_objectives\": [...], ...}"
-}
+Final State: + "learning_plan"
 ```
 
 ### Communication Pattern
@@ -377,14 +510,113 @@ Input from state:
 ...
 """
 
-# RecommendationAgent instruction
+# SynthesisAgent instruction
 """
-Based on the weakness analysis: {weakness_analysis}
+Combine into unified learning plan:
+- Study materials: {study_materials}
+- Practice problems: {practice_problems}
+- Learning strategy: {learning_strategy}
 ...
 """
 ```
 
 **Key Pattern**: `output_key` → next agent's placeholder
+
+---
+
+## Conversational Interface
+
+### Overview
+
+The conversational interface provides natural language interaction via ADK Web UI, allowing teachers and students to interact with the FeedbackSystem through chat.
+
+**Location**: `feedback_agent/conversational_agent.py`, `feedback_agent/conversational_tools.py`
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ADK Web UI                            │
+│                  (localhost:8000)                        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│              Conversational Agent (LlmAgent)            │
+│                                                         │
+│  System Instruction:                                    │
+│  - Authenticate users first                             │
+│  - Route to appropriate tools based on role             │
+│  - Format results for human readability                 │
+│                                                         │
+│  8 Tools:                                               │
+│  ┌─────────────────┬───────────────────────────────┐   │
+│  │ authenticate_user │ Login with name + role       │   │
+│  │ process_exam_from_image │ Grade from image      │   │
+│  │ process_exam_from_text │ Grade from text        │   │
+│  │ get_my_results │ Student's own results          │   │
+│  │ get_student_results │ Any student (teacher)     │   │
+│  │ get_class_analytics │ Class statistics          │   │
+│  │ list_students │ All registered students         │   │
+│  │ get_learning_recommendations │ Study plan       │   │
+│  └─────────────────┴───────────────────────────────┘   │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│              FeedbackSystem (Backend)                    │
+│              (InMemorySessionService)                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tools Detail
+
+| Tool | Role | Description |
+|------|------|-------------|
+| `authenticate_user` | All | Login with name and role (teacher/student) |
+| `process_exam_from_image` | Teacher | Grade an exam from uploaded image |
+| `process_exam_from_text` | Teacher | Grade an exam from text content |
+| `get_my_results` | All | View own exam results |
+| `get_student_results` | Teacher | View any student's results |
+| `get_class_analytics` | Teacher | View class-wide statistics |
+| `list_students` | Teacher | List all registered students |
+| `get_learning_recommendations` | All | Get personalized learning recommendations |
+
+### Image Handling
+
+The conversational interface supports multiple image sources with fallback:
+
+```python
+async def process_exam_from_image(ctx: ToolContext, ...):
+    # Priority 1: ADK Web UI uploaded images
+    image_bytes = extract_image_from_user_content(ctx)
+    if image_bytes:
+        return await process_image(image_bytes, ...)
+
+    # Priority 2: URL-based images
+    if image_path.startswith(("http://", "https://")):
+        image_bytes = await fetch_image_from_url(image_path)
+        return await process_image(image_bytes, ...)
+
+    # Priority 3: Local file path
+    if os.path.exists(image_path):
+        return await process_image_from_file(image_path, ...)
+```
+
+**Supported Formats**: PNG, JPEG, GIF, WebP
+
+### Role-Based Access
+
+**Teachers can**:
+- Grade exams from images or text
+- View any student's results
+- See class-wide analytics
+- List all students
+- Get learning recommendations for any student
+
+**Students can**:
+- View their own results only
+- Get their own learning recommendations
 
 ---
 
@@ -406,31 +638,42 @@ Based on the weakness analysis: {weakness_analysis}
 
 3. Runner.run_async()
    ├─ before_run_callback (metrics tracking)
-   ├─ Execute SequentialAgent pipeline
-   │  ├─ GradingAgent
-   │  │  ├─ before_agent_callback (start timer)
+   ├─ Execute Hybrid Agent Pipeline
+   │  │
+   │  ├─ GradingAgent (Sequential)
    │  │  ├─ LLM call (Gemini)
    │  │  ├─ Update state: grading_result
-   │  │  ├─ after_agent_callback (log duration + DB save)
-   │  │  └─ Event yielded
-   │  ├─ AnalysisAgent
-   │  │  ├─ before_agent_callback
-   │  │  ├─ LLM call
-   │  │  ├─ Update state: weakness_analysis
-   │  │  ├─ after_agent_callback (DB save)
-   │  │  └─ Event yielded
-   │  └─ RecommendationAgent
-   │     ├─ before_agent_callback
-   │     ├─ LLM call
+   │  │  └─ DB callback: log_exam()
+   │  │
+   │  ├─ LoopAgent (Quality Assurance, max 5 iterations)
+   │  │  ├─ AnalysisAgent
+   │  │  │  ├─ LLM call
+   │  │  │  └─ Update state: weakness_analysis
+   │  │  └─ ValidationAgent
+   │  │     ├─ Validate topics field exists
+   │  │     ├─ Validate weakness quality
+   │  │     └─ escalate=True on pass, retry on fail
+   │  │  └─ DB callback: log_analysis()
+   │  │
+   │  ├─ ParallelAgent (3 Recommenders - concurrent)
+   │  │  ├─ Study Materials Agent → study_materials
+   │  │  ├─ Practice Problems Agent → practice_problems
+   │  │  └─ Learning Strategy Agent → learning_strategy
+   │  │
+   │  └─ SynthesisAgent
+   │     ├─ LLM call (combines parallel outputs)
    │     ├─ Update state: learning_plan
-   │     ├─ after_agent_callback (DB save)
-   │     └─ Event yielded
+   │     └─ DB callback: log_recommendation()
+   │
    └─ after_run_callback (metrics finalization)
 
 4. Session State Persisted
-   └─ DatabaseSessionService.update_session()
+   └─ SessionService.update_session()
 
-5. Results Retrieved
+5. Memory Service Update
+   └─ Track cross-session patterns
+
+6. Results Retrieved
    ├─ Fetch from StudentDatabase
    └─ Return formatted results
 ```
@@ -840,30 +1083,43 @@ alignment = matching_recommendations / expected_recommendations
 
 ### Key Architectural Choices
 
-#### Why Sequential Agents?
+#### Why Hybrid Agent Pipeline?
 
-**Decision**: Use SequentialAgent instead of parallel or hierarchical patterns
-
-**Rationale**:
-- Grading must complete before analysis
-- Analysis must complete before recommendations
-- Linear dependency chain
-- Simpler error handling
-- Clear state flow
-
-**Trade-off**: Cannot parallelize independent operations, but none exist in this workflow
-
-#### Why DatabaseSessionService over InMemorySessionService?
-
-**Decision**: Use persistent sessions
+**Decision**: Use Sequential + Loop + Parallel agents instead of pure sequential
 
 **Rationale**:
+- **Sequential for dependencies**: Grading → Analysis → Recommendations must run in order
+- **LoopAgent for quality**: ValidationAgent ensures analysis quality before proceeding
+- **ParallelAgent for efficiency**: 3 recommendation agents run concurrently
+- **SynthesisAgent for coherence**: Combines parallel outputs into unified plan
+
+**Benefits**:
+- Quality assurance through validation loops (up to 5 retries)
+- Faster recommendation generation (3 agents in parallel)
+- Unified learning plan from diverse recommendation sources
+- Clear separation of concerns
+
+**Trade-off**: More complex pipeline, but better output quality and efficiency
+
+#### Why Two SessionService Implementations?
+
+**Decision**: DatabaseSessionService for exam processing, InMemorySessionService for conversational tools
+
+**Rationale**:
+
+**DatabaseSessionService (exam processing)**:
 - Session resumption after crashes
-- Audit trail of conversations
+- Audit trail of exam processing
 - Context compaction requires history
 - Production-ready pattern
 
-**Trade-off**: Slightly slower (SQLite I/O), but negligible for exam processing workload
+**InMemorySessionService (conversational interface)**:
+- Avoids async SQLite driver conflicts in ADK Web UI context
+- Simpler state management for chat flow
+- Each conversation is independent (no persistence needed)
+- Better compatibility with ADK Web UI
+
+**Trade-off**: Conversational sessions are not persisted, but this is acceptable for chat interactions
 
 #### Why Direct API Calls for Image Processing?
 
@@ -894,26 +1150,23 @@ alignment = matching_recommendations / expected_recommendations
 
 ## Future Enhancements
 
-### Phase 3: Memory Service (Optional)
+### Already Implemented
 
-**Goal**: Cross-session learning progression tracking
+**MemoryService** (Cross-session learning progression tracking):
+- `get_recurring_weaknesses(student_id)`: Identifies persistent learning gaps
+- `get_learning_velocity(student_id)`: Measures improvement rate over time
+- `recommend_review_topics(student_id)`: Suggests topics for spaced repetition
 
-**Implementation**:
-```python
-class StudentMemoryService:
-    """Track student learning over time"""
+**Conversational Interface**:
+- ADK Web UI integration
+- 8 tools for natural language interaction
+- Role-based authentication (teacher/student)
+- Image upload support
 
-    def get_recurring_weaknesses(student_id, timeframe_days=90):
-        """Identify persistent learning gaps"""
-
-    def get_learning_velocity(student_id, topic):
-        """Measure improvement rate on specific topics"""
-
-    def recommend_review_topics(student_id):
-        """Suggest topics for spaced repetition"""
-```
-
-**Integration**: Custom memory service following ADK patterns
+**Hybrid Pipeline**:
+- LoopAgent with ValidationAgent for quality assurance
+- ParallelAgent for concurrent recommendation generation
+- SynthesisAgent for unified learning plans
 
 ### Production Enhancements
 
@@ -976,14 +1229,17 @@ ai_agent_capstone/
 │   └── *.db                       # Test databases
 ├── feedback_agent/
 │   ├── agents/
-│   │   ├── grading_agent.py
-│   │   ├── analysis_agent.py
-│   │   ├── recommendation_agent.py
-│   │   └── image_processing_agent.py
-│   ├── agent.py                   # Main system
+│   │   ├── grading_agent.py       # Exam scoring
+│   │   ├── analysis_agent.py      # Weakness identification
+│   │   ├── recommendation_agent.py # Learning recommendations
+│   │   └── image_processing_agent.py # Image extraction
+│   ├── agent.py                   # Main FeedbackSystem + pipeline
+│   ├── conversational_agent.py    # ADK Web UI conversational agent
+│   ├── conversational_tools.py    # 8 tools for conversational interface
 │   ├── auth.py                    # Authentication
 │   ├── authorization.py           # Authorization tools
 │   ├── database.py                # Data persistence
+│   ├── memory.py                  # Cross-session tracking
 │   ├── plugins.py                 # Custom metrics plugin
 │   └── custom_llm.py              # Gemini wrapper
 ├── evals/
@@ -999,14 +1255,15 @@ ai_agent_capstone/
 │   └── test_refactored_agent.py
 ├── docs/
 │   ├── ARCHITECTURE.md            # This document
-│   └── CAPSTONE_REPORT.md         # Project report
-├── README.md                      # User documentation
-├── PROGRESS.md                    # Development tracking
+│   ├── CAPSTONE_REPORT.md         # Project report
+│   └── HOW-TO-USE.md              # User guide
+├── README.md                      # Project overview
+├── demo.py                        # Interactive demo
 └── pyproject.toml                 # Dependencies
 ```
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 2.0
 **Author**: Development Team
-**Last Review**: 2025-11-24
+**Last Review**: 2025-11-26

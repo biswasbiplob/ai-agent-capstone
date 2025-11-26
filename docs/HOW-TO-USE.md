@@ -57,12 +57,13 @@ Try the interactive demo:
 python demo.py
 ```
 
-Or explore the conversational interface:
+Or use the conversational interface:
 ```bash
+cd feedback_agent
 adk web
 ```
 
-**Note**: The `adk web` interface provides guidance on using the system. For actual exam processing, use `demo.py` or the Python API.
+Then open `http://localhost:8000` in your browser.
 
 **Demo Options** - Select from 5 demos:
 1. Basic Exam Processing - See how grading works
@@ -183,21 +184,24 @@ ai_agent_capstone/
 │   │   ├── analysis_agent.py
 │   │   ├── recommendation_agent.py
 │   │   └── image_processing_agent.py
-│   ├── agent.py                # Main system
+│   ├── agent.py                # Main system (FeedbackSystem, pipeline, root_agent)
+│   ├── conversational_agent.py # ADK Web UI conversational agent
+│   ├── conversational_tools.py # 8 tools for conversational interface
 │   ├── auth.py                 # Authentication
 │   ├── authorization.py        # Access control
 │   ├── database.py             # Data persistence
 │   ├── memory.py               # Cross-session tracking
-│   └── plugins.py              # Metrics & logging
+│   ├── plugins.py              # Metrics & logging
+│   └── custom_llm.py           # Custom Gemini wrapper
 ├── tests/                      # Test suites
 ├── evals/                      # Evaluation framework
 ├── docs/                       # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── CAPSTONE_REPORT.md
-│   └── EVALUATION_SUMMARY.md
+│   └── HOW-TO-USE.md
 ├── .adr/                       # Architecture Decision Records
 ├── demo.py                     # Interactive demo
-└── README.md                   # This file
+└── README.md                   # Project overview
 ```
 
 ## Features Deep Dive
@@ -238,6 +242,72 @@ ai_agent_capstone/
 - Performance monitoring
 - Structured logging
 
+### 8. Conversational Interface (ADK Web UI)
+- Natural language interaction via `adk web`
+- Role-based authentication (teacher/student)
+- 8 tools for complete exam processing workflow
+- Image upload support (drag & drop or URLs)
+
+## Using the Conversational Interface
+
+The conversational interface provides a user-friendly way to interact with LearnPath Agent through natural language.
+
+### Starting the Interface
+
+```bash
+cd feedback_agent
+adk web
+```
+
+Open `http://localhost:8000` in your browser.
+
+### Authentication Flow
+
+At the start of each conversation, identify yourself:
+
+```
+User: Hi, I'm Ms. Johnson, a teacher
+Agent: Welcome, Ms. Johnson! As a teacher, you can:
+       - Grade exams from images or text
+       - View any student's results
+       - See class-wide analytics
+       What would you like to do?
+```
+
+### Teacher Capabilities
+
+| Action | How to Request |
+|--------|----------------|
+| Grade image exam | Upload image + "Grade this for [student name]" |
+| Grade text exam | Provide questions, answers, and answer key |
+| View student results | "Show me [student name]'s results" |
+| Class analytics | "Show me class statistics" |
+| List students | "List all students" |
+
+### Student Capabilities
+
+| Action | How to Request |
+|--------|----------------|
+| View own results | "Show me my results" |
+| Get recommendations | "What should I study?" |
+
+### Uploading Exam Images
+
+You can upload exam images in several ways:
+
+1. **Drag & Drop**: Drag an image directly into the chat
+2. **Paste URL**: Provide a public URL to an image
+3. **File Path**: When running locally, provide a local file path
+
+**Example:**
+```
+User: [uploads exam.png] Grade this math exam for Alice
+Agent: I've processed the exam. Alice scored 8/10 (80%).
+       Areas for improvement:
+       - Quadratic Equations (medium)
+       - Factorization (low)
+```
+
 ## Documentation
 
 - **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System design and architecture
@@ -246,23 +316,29 @@ ai_agent_capstone/
 
 ## How It Works
 
-The system uses a sequential agent pipeline:
+The system uses a hybrid multi-agent pipeline:
 
 ```
-Input → Grading Agent → Analysis Agent → Recommendation Agent → Database
-         (scores)         (weaknesses)      (study plan)
+Input → GradingAgent → LoopAgent(Analysis + Validation) → ParallelAgent(3 Recommenders) → SynthesisAgent → Output
 ```
 
-Each agent:
-1. **Grading Agent**: Compares answers, calculates scores
-2. **Analysis Agent**: Identifies concepts where student struggles
-3. **Recommendation Agent**: Creates personalized study plan
-4. **Memory Service**: Tracks patterns across multiple exams
+**Pipeline Stages:**
+1. **GradingAgent**: Compares answers against answer key, calculates scores
+2. **LoopAgent (Quality Assurance)**:
+   - **AnalysisAgent**: Identifies conceptual weaknesses (not question text)
+   - **ValidationAgent**: Ensures analysis quality, retries if needed (up to 5x)
+3. **ParallelAgent (Recommendations)**: Runs 3 agents simultaneously:
+   - **Study Materials Agent**: Curates learning resources
+   - **Practice Problems Agent**: Generates targeted exercises
+   - **Learning Strategy Agent**: Develops study techniques
+4. **SynthesisAgent**: Combines parallel outputs into unified learning plan
+5. **MemoryService**: Tracks patterns across multiple exams
 
 Built using Google ADK best practices:
 - Runner pattern for session management
 - State flow with output_key pattern
-- DatabaseSessionService for persistence
+- LoopAgent for quality assurance with validation
+- ParallelAgent for efficient recommendation generation
 - Custom plugins for observability
 
 ## Evaluation Results
@@ -319,12 +395,14 @@ Demonstrates best practices from Kaggle AI Agents course:
 
 | Concept | Implementation |
 |---------|----------------|
-| Agent Basics | Sequential pipeline with 3 specialized agents |
-| Tools | Authorization tools with ToolContext |
-| Runner & Sessions | DatabaseSessionService, proper state management |
+| Agent Basics | Hybrid pipeline: Sequential + Loop + Parallel agents |
+| Tools | 8 conversational tools with ToolContext |
+| Runner & Sessions | SessionService for state management |
 | State Management | output_key pattern for agent communication |
-| Multimodal | Gemini vision for image processing |
-| Observability | Custom metrics plugin + structured logging |
+| LoopAgent | Quality assurance with ValidationAgent (up to 5 retries) |
+| ParallelAgent | 3 specialized recommendation agents running concurrently |
+| Multimodal | Gemini vision for image processing (ADK Web UI upload) |
+| Observability | Custom ExamMetricsPlugin + structured logging |
 
 ## License
 
