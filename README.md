@@ -42,6 +42,73 @@ graph TD
     SA --> MEM
 ```
 
+<details>
+<summary>ASCII Diagram (click to expand)</summary>
+
+```
+                        ┌─────────────────────────────────────┐
+                        │   User (Teacher/Student)            │
+                        └──────────────────┬──────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     ConversationalAgent (ADK Web UI)                         │
+│  ┌─────────────┐    ┌─────────────────────────────────────────────────────┐  │
+│  │  LlmAgent   │    │  8 Tools (auth, grade, results, analytics, etc.)   │  │
+│  └─────────────┘    └─────────────────────────────────────────────────────┘  │
+└──────────────────────────────────┬───────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                      FeedbackSystem (ADK Runner)                             │
+│                                                                              │
+│  ┌────────────────┐                                                          │
+│  │ Exam Input     │                                                          │
+│  └───────┬────────┘                                                          │
+│          ▼                                                                   │
+│  ┌────────────────┐                                                          │
+│  │ GradingAgent   │─────────────────────────────────┐                        │
+│  └───────┬────────┘                                 │                        │
+│          ▼                                          │                        │
+│  ┌─────────────────────────────────────┐            │                        │
+│  │         LoopAgent (QA)              │            │                        │
+│  │  ┌───────────────┐                  │            │                        │
+│  │  │ AnalysisAgent │──────────┐       │            │                        │
+│  │  └───────────────┘          │       │            │                        │
+│  │          ▲                  ▼       │            │                        │
+│  │          │ retry   ┌────────────────┤            │                        │
+│  │          └─────────│ValidationAgent │            │                        │
+│  │                    └────────────────┘            │                        │
+│  └───────────────────────┬─────────────┘            │                        │
+│                          ▼                          │                        │
+│  ┌─────────────────────────────────────────────┐    │                        │
+│  │            ParallelAgent                    │    │                        │
+│  │  ┌─────────────┬─────────────┬────────────┐ │    │                        │
+│  │  │   Study     │  Practice   │  Learning  │ │    │                        │
+│  │  │  Materials  │  Problems   │  Strategy  │ │    │                        │
+│  │  │   Agent     │   Agent     │   Agent    │ │    │                        │
+│  │  └─────────────┴─────────────┴────────────┘ │    │                        │
+│  └───────────────────────┬─────────────────────┘    │                        │
+│                          ▼                          │                        │
+│  ┌────────────────────────────────────────┐         │                        │
+│  │          SynthesisAgent                │─────────┼───────────┐            │
+│  └───────────────────┬────────────────────┘         │           │            │
+│                      ▼                              │           │            │
+│  ┌────────────────────────────────────────┐         │           │            │
+│  │           Learning Plan                │         │           │            │
+│  └────────────────────────────────────────┘         │           │            │
+│                                                     │           │            │
+└─────────────────────────────────────────────────────┼───────────┼────────────┘
+                                                      │           │
+                                                      ▼           ▼
+                                              ┌───────────┐ ┌─────────────┐
+                                              │  Student  │ │   Memory    │
+                                              │  Database │ │   Service   │
+                                              └───────────┘ └─────────────┘
+```
+
+</details>
+
 ## Project Overview - LearnPath Agent
 
 This project contains the core logic for LearnPath Agent, a multi-agent system designed to automate exam grading, identify conceptual weaknesses, and generate personalized learning recommendations. The agent is built using Google Agent Development Kit (ADK) and follows a modular architecture combining sequential, parallel, and loop agent patterns.
