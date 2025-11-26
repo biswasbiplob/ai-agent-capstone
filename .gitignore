@@ -19,3 +19,5 @@ wheels/
 
 # Evaluation results
 evals/eval_results_*.json
+
+.DS_Store
