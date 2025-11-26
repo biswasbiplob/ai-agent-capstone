@@ -173,7 +173,11 @@ class EvaluationRunner:
                 "percentage": result.get("percentage", 0.0),
             }
 
-            predicted_analysis = {"weaknesses": result.get("weaknesses", [])}
+            predicted_analysis = {
+                "weaknesses": result.get("weaknesses", []),
+                "topics": result.get("topics", []),
+                "summary": result.get("summary", "")
+            }
 
             predicted_recommendations = {
                 "recommendations": result.get("recommendations", "")
