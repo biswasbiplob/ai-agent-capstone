@@ -55,7 +55,33 @@ class RecommendationAgent:
             Be specific and actionable.
             '''
         )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "learning_objectives": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "topic": types.Schema(type=types.Type.STRING),
+                            "objective": types.Schema(type=types.Type.STRING),
+                            "resources": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(type=types.Type.STRING),
+                            ),
+                        },
+                        required=["topic", "objective", "resources"],
+                    ),
+                ),
+                "encouragement": types.Schema(type=types.Type.STRING),
+            },
+            required=["learning_objectives", "encouragement"],
+        )
+
+        self.agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
 
     def generate_recommendations(self, weaknesses: List[str]) -> Dict[str, Any]:
         prompt = f"""

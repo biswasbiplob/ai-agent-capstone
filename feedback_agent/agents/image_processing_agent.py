@@ -154,11 +154,22 @@ If no answer key is visible, set "answer_key" to "Not found".
 
         # Call model directly with multimodal input
         try:
+            response_schema = types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "subject": types.Schema(type=types.Type.STRING),
+                    "exam_content": types.Schema(type=types.Type.STRING),
+                    "answer_key": types.Schema(type=types.Type.STRING),
+                },
+                required=["subject", "exam_content", "answer_key"],
+            )
+
             response = await self.model.generate_content(
                 model=self.model_name,
                 contents=[types.Content(role="user", parts=parts)],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
+                    response_mime_type="application/json",
+                    response_schema=response_schema,
                 ),
             )
 

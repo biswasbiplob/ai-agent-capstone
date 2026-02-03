@@ -61,6 +61,22 @@ class StudentDatabase:
         conn.commit()
         conn.close()
 
+    def get_student_by_name(self, name: str) -> Optional[Dict]:
+        """Get a specific student by name (case-insensitive)."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, name FROM students WHERE lower(name) = lower(?)',
+            (name,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {'student_id': row['id'], 'name': row['name']}
+        return None
+
     def log_exam(self, exam_id: str, student_id: str, subject: str, total_score: float, max_score: float):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -103,10 +119,11 @@ class StudentDatabase:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT e.subject, e.total_score, e.max_score, a.weaknesses
+            SELECT e.id, e.date, e.subject, e.total_score, e.max_score, a.weaknesses
             FROM exams e
             LEFT JOIN analysis a ON e.id = a.exam_id
             WHERE e.student_id = ?
+            ORDER BY e.date ASC
         ''', (student_id,))
         rows = cursor.fetchall()
         conn.close()
@@ -114,6 +131,8 @@ class StudentDatabase:
         history = []
         for row in rows:
             history.append({
+                'exam_id': row['id'],
+                'date': row['date'],
                 'subject': row['subject'],
                 'score': row['total_score'],
                 'max_score': row['max_score'],

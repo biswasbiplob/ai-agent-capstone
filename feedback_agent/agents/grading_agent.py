@@ -59,7 +59,41 @@ class GradingAgent:
             }
             '''
         )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "total_score": types.Schema(type=types.Type.NUMBER),
+                "max_score": types.Schema(type=types.Type.NUMBER),
+                "corrections": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "question": types.Schema(type=types.Type.STRING),
+                            "student_answer": types.Schema(type=types.Type.STRING),
+                            "correct_answer": types.Schema(type=types.Type.STRING),
+                            "is_correct": types.Schema(type=types.Type.BOOLEAN),
+                            "feedback": types.Schema(type=types.Type.STRING),
+                            "score": types.Schema(type=types.Type.NUMBER),
+                        },
+                        required=[
+                            "question",
+                            "student_answer",
+                            "correct_answer",
+                            "is_correct",
+                            "feedback",
+                        ],
+                    ),
+                ),
+                "general_feedback": types.Schema(type=types.Type.STRING),
+            },
+            required=["total_score", "max_score", "corrections", "general_feedback"],
+        )
+
+        self.agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
 
     def grade_exam(self, exam_content: str, answer_key: str) -> Dict[str, Any]:
         logger.info("GradingAgent.grade_exam called.")
@@ -109,4 +143,3 @@ class GradingAgent:
                 "corrections": [],
                 "general_feedback": "Error parsing grading response."
             }
-
