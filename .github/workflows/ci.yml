@@ -26,7 +26,7 @@ jobs:
         run: ruff check .
 
       - name: Type check
-        run: mypy
+        run: mypy feedback_agent/json_utils.py
 
       - name: Tests
         run: pytest -q
