@@ -9,12 +9,9 @@ This script demonstrates:
 5. Permission checks working correctly
 """
 
-import importlib.util
-
 import pytest
 
-if importlib.util.find_spec("google.adk") is None:
-    pytest.skip("google.adk not installed", allow_module_level=True)
+pytest.importorskip("google.adk")
 
 import asyncio
 import logging

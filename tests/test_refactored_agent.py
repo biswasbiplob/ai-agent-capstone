@@ -5,12 +5,9 @@ This script validates that the new Runner-based implementation works correctly
 and follows ADK best practices.
 """
 
-import importlib.util
-
 import pytest
 
-if importlib.util.find_spec("google.adk") is None:
-    pytest.skip("google.adk not installed", allow_module_level=True)
+pytest.importorskip("google.adk")
 
 import asyncio
 import logging

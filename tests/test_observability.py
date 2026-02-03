@@ -8,12 +8,9 @@ This test verifies:
 4. Summary statistics are accurate
 """
 
-import importlib.util
-
 import pytest
 
-if importlib.util.find_spec("google.adk") is None:
-    pytest.skip("google.adk not installed", allow_module_level=True)
+pytest.importorskip("google.adk")
 
 import asyncio
 import os
