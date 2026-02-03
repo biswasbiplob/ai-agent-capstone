@@ -4,6 +4,13 @@ Test script for the image processing agent.
 This script tests multimodal support by processing exam images and extracting content.
 """
 
+import importlib.util
+
+import pytest
+
+if importlib.util.find_spec("google.adk") is None:
+    pytest.skip("google.adk not installed", allow_module_level=True)
+
 import asyncio
 import logging
 import os
@@ -11,7 +18,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-env_path = Path(__file__).parent / "feedback_agent" / ".env"
+env_path = Path(__file__).resolve().parent.parent / "feedback_agent" / ".env"
 load_dotenv(env_path)
 
 # Verify API key
