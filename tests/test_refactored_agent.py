@@ -26,6 +26,7 @@ load_dotenv(env_path)
 if not os.getenv("GOOGLE_API_KEY"):
     print("⚠️  Warning: GOOGLE_API_KEY not found in environment!")
     print(f"   Tried loading from: {env_path}")
+    pytest.skip("GOOGLE_API_KEY not set", allow_module_level=True)
 else:
     print(f"✅ API Key loaded successfully")
 
