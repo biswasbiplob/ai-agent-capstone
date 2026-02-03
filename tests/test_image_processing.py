@@ -4,6 +4,10 @@ Test script for the image processing agent.
 This script tests multimodal support by processing exam images and extracting content.
 """
 
+import pytest
+
+pytest.importorskip("google.adk")
+
 import asyncio
 import logging
 import os
@@ -11,13 +15,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-env_path = Path(__file__).parent / "feedback_agent" / ".env"
+env_path = Path(__file__).resolve().parent.parent / "feedback_agent" / ".env"
 load_dotenv(env_path)
 
 # Verify API key
 if not os.getenv("GOOGLE_API_KEY"):
     print("⚠️  Warning: GOOGLE_API_KEY not found in environment!")
     print(f"   Tried loading from: {env_path}")
+    pytest.skip("GOOGLE_API_KEY not set", allow_module_level=True)
 else:
     print(f"✅ API Key loaded successfully")
 

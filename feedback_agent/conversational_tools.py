@@ -55,7 +55,7 @@ def check_authorization(
         return False, "Not authenticated. Please tell me your name and role first."
 
     current_role = tool_context.state.get("current_user_role")
-    current_user_id = tool_context.state.get("current_user_id")
+    current_student_id = tool_context.state.get("current_student_id")
 
     # No specific role required - any authenticated user is allowed
     if required_role is None:
@@ -64,7 +64,7 @@ def check_authorization(
     # Check teacher role
     if required_role == "teacher" and current_role != "teacher":
         # But allow students to access their own data if enabled
-        if allow_own_data and target_student_id and current_user_id == target_student_id:
+        if allow_own_data and target_student_id and current_student_id == target_student_id:
             return True, ""
         return False, "This action requires teacher privileges."
 
@@ -320,6 +320,19 @@ def authenticate_user(
     tool_context.state["is_authenticated"] = True
 
     logger.info(f"Authenticated user: {name} ({role_lower}) - ID: {user_id}")
+
+    # For students, map to a stable student_id
+    if role_lower == "student":
+        try:
+            from feedback_agent.agent import get_feedback_system
+
+            system = get_feedback_system()
+            student = system.db.get_student_by_name(name)
+            student_id = student["student_id"] if student else system.register_student(name)
+            tool_context.state["current_student_id"] = student_id
+        except Exception as e:
+            logger.error(f"Failed to map student id for {name}: {e}")
+            tool_context.state["current_student_id"] = None
 
     # Return capabilities based on role
     if role_lower == "teacher":
@@ -592,6 +605,7 @@ def get_my_results(tool_context: ToolContext) -> Dict[str, Any]:
 
     user_name = tool_context.state.get("current_user_name")
     user_role = tool_context.state.get("current_user_role")
+    student_id = tool_context.state.get("current_student_id")
 
     logger.info(f"get_my_results called by {user_name} ({user_role})")
 
@@ -601,21 +615,17 @@ def get_my_results(tool_context: ToolContext) -> Dict[str, Any]:
         system = get_feedback_system()
         db = system.db
 
-        # Find student by name (simplified - in production would use proper user mapping)
-        all_students = db.get_all_students()
-        student = next(
-            (s for s in all_students if s["name"].lower() == user_name.lower()),
-            None,
-        )
+        if not student_id:
+            # Fallback to name lookup if student_id not mapped
+            student = db.get_student_by_name(user_name) if user_name else None
+            student_id = student["student_id"] if student else None
 
-        if not student:
+        if not student_id:
             return {
                 "status": "success",
                 "message": f"No exam records found for {user_name}.",
                 "exams": [],
             }
-
-        student_id = student["student_id"]
         exams = db.get_student_exams(student_id)
 
         if not exams:
@@ -700,11 +710,7 @@ def get_student_results(
         if student_id:
             student = db.get_student(student_id)
         else:
-            all_students = db.get_all_students()
-            student = next(
-                (s for s in all_students if student_name.lower() in s["name"].lower()),
-                None,
-            )
+            student = db.get_student_by_name(student_name) if student_name else None
 
         if not student:
             return {
@@ -712,16 +718,16 @@ def get_student_results(
                 "message": f"Student not found: {student_name or student_id}",
             }
 
-        student_id = student["student_id"]
-        student_name = student["name"]
-        exams = db.get_student_exams(student_id)
+        student_id_value: str = student["student_id"]
+        student_name_value: str = student["name"]
+        exams = db.get_student_exams(student_id_value)
 
         if not exams:
             return {
                 "status": "success",
-                "message": f"No exams recorded for {student_name}.",
-                "student_name": student_name,
-                "student_id": student_id,
+                "message": f"No exams recorded for {student_name_value}.",
+                "student_name": student_name_value,
+                "student_id": student_id_value,
                 "exams": [],
             }
 
@@ -743,8 +749,8 @@ def get_student_results(
 
         return {
             "status": "success",
-            "student_name": student_name,
-            "student_id": student_id,
+            "student_name": student_name_value,
+            "student_id": student_id_value,
             "summary": {
                 "total_exams": len(exams),
                 "average_percentage": round(avg_percentage, 1),
@@ -844,7 +850,7 @@ def get_class_analytics(tool_context: ToolContext) -> Dict[str, Any]:
         lowest = min(student_performances, key=lambda s: s["average_percentage"])
 
         # Find common weaknesses
-        weakness_counts = {}
+        weakness_counts: Dict[str, int] = {}
         for w in all_class_weaknesses:
             topic = w.get("topic", "Unknown")
             weakness_counts[topic] = weakness_counts.get(topic, 0) + 1
@@ -929,6 +935,7 @@ def list_students(tool_context: ToolContext) -> Dict[str, Any]:
 def get_learning_recommendations(
     tool_context: ToolContext,
     student_name: Optional[str] = None,
+    student_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Get personalized learning recommendations.
@@ -939,6 +946,7 @@ def get_learning_recommendations(
     Args:
         tool_context: ADK tool context with session state
         student_name: Name of student (teachers can specify, students use own)
+        student_id: Student ID (preferred for teachers)
 
     Returns:
         Dictionary with learning recommendations
@@ -950,11 +958,13 @@ def get_learning_recommendations(
 
     current_role = tool_context.state.get("current_user_role")
     current_name = tool_context.state.get("current_user_name")
+    current_student_id = tool_context.state.get("current_student_id")
 
     # Students can only get their own recommendations
     if current_role == "student":
         student_name = current_name
-    elif not student_name:
+        student_id = current_student_id
+    elif not student_name and not student_id:
         return {
             "status": "error",
             "message": "Please specify which student to get recommendations for.",
@@ -969,22 +979,24 @@ def get_learning_recommendations(
         db = system.db
 
         # Find student
-        all_students = db.get_all_students()
-        student = next(
-            (s for s in all_students if student_name.lower() in s["name"].lower()),
-            None,
-        )
+        student_id_value: Optional[str] = student_id
+        if not student_id_value:
+            student = db.get_student_by_name(student_name) if student_name else None
+            if not student:
+                return {
+                    "status": "error",
+                    "message": f"Student not found: {student_name}",
+                }
+            student_id_value = student["student_id"]
 
-        if not student:
+        if not student_id_value:
             return {
                 "status": "error",
-                "message": f"Student not found: {student_name}",
+                "message": "Student ID not available for recommendations.",
             }
 
-        student_id = student["student_id"]
-
         # Get latest exam with recommendations
-        exams = db.get_student_exams(student_id)
+        exams = db.get_student_exams(student_id_value)
 
         if not exams:
             return {

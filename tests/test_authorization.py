@@ -9,6 +9,10 @@ This script demonstrates:
 5. Permission checks working correctly
 """
 
+import pytest
+
+pytest.importorskip("google.adk")
+
 import asyncio
 import logging
 from google.adk.tools.tool_context import ToolContext

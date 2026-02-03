@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from google.genai import types
 from feedback_agent.custom_llm import CustomGemini
+from feedback_agent.json_utils import parse_json_payload
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ If the subject is not stated, infer it from the content.
 If no answer key is visible, set "answer_key" to "Not found".
 """
 
-    def __init__(self, model: str = None):
+    def __init__(self, model: Optional[str] = None):
         """
         Initialize the image processing agent.
 
@@ -154,11 +155,22 @@ If no answer key is visible, set "answer_key" to "Not found".
 
         # Call model directly with multimodal input
         try:
+            response_schema = types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "subject": types.Schema(type=types.Type.STRING),
+                    "exam_content": types.Schema(type=types.Type.STRING),
+                    "answer_key": types.Schema(type=types.Type.STRING),
+                },
+                required=["subject", "exam_content", "answer_key"],
+            )
+
             response = await self.model.generate_content(
                 model=self.model_name,
                 contents=[types.Content(role="user", parts=parts)],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
+                    response_mime_type="application/json",
+                    response_schema=response_schema,
                 ),
             )
 
@@ -175,10 +187,17 @@ If no answer key is visible, set "answer_key" to "Not found".
 
             # Parse JSON response
             if response_text:
-                # The agent is configured to return JSON, so parse it
-                result = json.loads(response_text)
-                logger.info(f"Successfully extracted exam content from image")
-                return result
+                result = parse_json_payload(response_text, "image_processing")
+                if result:
+                    logger.info("Successfully extracted exam content from image")
+                    return result
+                logger.warning("Failed to parse JSON from image processing response")
+                return {
+                    "subject": "Unknown",
+                    "exam_content": response_text,
+                    "answer_key": "Not found",
+                    "error": "Failed to parse JSON response",
+                }
             else:
                 logger.warning("Empty response from image processing")
                 return {
@@ -191,16 +210,6 @@ If no answer key is visible, set "answer_key" to "Not found".
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing image processing JSON: {e}")
             logger.debug(f"Raw response: {response_text[:500]}")
-            # Try to extract JSON from response
-            try:
-                start = response_text.find("{")
-                end = response_text.rfind("}") + 1
-                if start != -1 and end != -1:
-                    json_str = response_text[start:end]
-                    return json.loads(json_str)
-            except:
-                pass
-
             return {
                 "subject": "Unknown",
                 "exam_content": response_text if response_text else "",

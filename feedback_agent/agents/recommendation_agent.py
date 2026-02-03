@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import Agent
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from google.genai import types
 import json
 
@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 from feedback_agent.custom_llm import CustomGemini
+from feedback_agent.json_utils import parse_json_payload
 
 class RecommendationAgent:
-    def __init__(self, model: str = None):
+    def __init__(self, model: Optional[str] = None):
         # Get model from environment or use provided value
         if model is None:
             model = os.getenv('MODEL_NAME')
@@ -55,7 +56,33 @@ class RecommendationAgent:
             Be specific and actionable.
             '''
         )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "learning_objectives": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "topic": types.Schema(type=types.Type.STRING),
+                            "objective": types.Schema(type=types.Type.STRING),
+                            "resources": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(type=types.Type.STRING),
+                            ),
+                        },
+                        required=["topic", "objective", "resources"],
+                    ),
+                ),
+                "encouragement": types.Schema(type=types.Type.STRING),
+            },
+            required=["learning_objectives", "encouragement"],
+        )
+
+        self.agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
 
     def generate_recommendations(self, weaknesses: List[str]) -> Dict[str, Any]:
         prompt = f"""
@@ -69,14 +96,10 @@ class RecommendationAgent:
         response_text = run_agent(self.agent, prompt + "\n\nProvide the output as a valid JSON string.")
         
         try:
-            text = response_text
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            if start != -1 and end != -1:
-                json_str = text[start:end]
-                return json.loads(json_str)
-            else:
-                raise ValueError("No JSON found in response")
+            parsed = parse_json_payload(response_text, "recommendations")
+            if parsed:
+                return parsed
+            raise ValueError("No JSON found in response")
         except Exception as e:
             logger.error(f"Error parsing recommendation response: {e}")
             return {

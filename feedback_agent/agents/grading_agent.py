@@ -1,6 +1,6 @@
 
 from google.adk.agents.llm_agent import Agent
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from google.genai import types
 
 import logging
@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 from feedback_agent.custom_llm import CustomGemini
+from feedback_agent.json_utils import parse_json_payload
 
 class GradingAgent:
-    def __init__(self, model: str = None):
+    def __init__(self, model: Optional[str] = None):
         # Get model from environment or use provided value
         if model is None:
             model = os.getenv('MODEL_NAME')
@@ -59,7 +60,41 @@ class GradingAgent:
             }
             '''
         )
-        self.agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "total_score": types.Schema(type=types.Type.NUMBER),
+                "max_score": types.Schema(type=types.Type.NUMBER),
+                "corrections": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "question": types.Schema(type=types.Type.STRING),
+                            "student_answer": types.Schema(type=types.Type.STRING),
+                            "correct_answer": types.Schema(type=types.Type.STRING),
+                            "is_correct": types.Schema(type=types.Type.BOOLEAN),
+                            "feedback": types.Schema(type=types.Type.STRING),
+                            "score": types.Schema(type=types.Type.NUMBER),
+                        },
+                        required=[
+                            "question",
+                            "student_answer",
+                            "correct_answer",
+                            "is_correct",
+                            "feedback",
+                        ],
+                    ),
+                ),
+                "general_feedback": types.Schema(type=types.Type.STRING),
+            },
+            required=["total_score", "max_score", "corrections", "general_feedback"],
+        )
+
+        self.agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
 
     def grade_exam(self, exam_content: str, answer_key: str) -> Dict[str, Any]:
         logger.info("GradingAgent.grade_exam called.")
@@ -90,16 +125,11 @@ class GradingAgent:
         
         logger.debug(f"GradingAgent raw response: {response_text[:200]}...")
         
-        # Simple cleanup to ensure we get the JSON part if there's extra text
         try:
-            import json
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-            if start != -1 and end != -1:
-                json_str = response_text[start:end]
-                return json.loads(json_str)
-            else:
-                raise ValueError("No JSON found in response")
+            parsed = parse_json_payload(response_text, "grading_result")
+            if parsed:
+                return parsed
+            raise ValueError("No JSON found in response")
         except Exception as e:
             logger.error(f"Error parsing grading response: {e}")
             logger.error(f"Raw response: {response_text}")
@@ -109,4 +139,3 @@ class GradingAgent:
                 "corrections": [],
                 "general_feedback": "Error parsing grading response."
             }
-

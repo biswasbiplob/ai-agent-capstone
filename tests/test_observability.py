@@ -8,6 +8,10 @@ This test verifies:
 4. Summary statistics are accurate
 """
 
+import pytest
+
+pytest.importorskip("google.adk")
+
 import asyncio
 import os
 import json

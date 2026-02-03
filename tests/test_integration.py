@@ -1,28 +1,18 @@
-import pytest
-import os
-from feedback_agent.agent import FeedbackSystem
+import asyncio
+from unittest.mock import patch
 
-@pytest.fixture
-def system():
-    # Use a temporary db for testing
-    db_path = "data/test_students.db"
-    if os.path.exists(db_path):
-        os.remove(db_path)
-    
-    sys = FeedbackSystem(db_path=db_path)
-    yield sys
-    
-    if os.path.exists(db_path):
-        os.remove(db_path)
+from feedback_agent.database import StudentDatabase
 
 
+def test_full_flow_mocked(tmp_path):
+    import pytest
+    pytest.importorskip("google.adk")
+    db_path = tmp_path / "students.db"
+    _ = StudentDatabase(str(db_path))
 
-def test_full_flow_mocked(system):
-    from unittest.mock import patch
-    import json
+    def mock_run_agent(agent, prompt, image_path=None, image_bytes=None, session_state=None):
+        import json
 
-    # Mock responses for different agents
-    def mock_run_agent(agent, prompt):
         if "grading_agent" in agent.name:
             return json.dumps({
                 "total_score": 8,
@@ -49,43 +39,73 @@ def test_full_flow_mocked(system):
             })
         elif "analysis_agent" in agent.name:
             return json.dumps({
-                "weaknesses": ["Arithmetic"],
+                "topics": ["Arithmetic"],
+                "weaknesses": [
+                    {"topic": "Arithmetic", "description": "Struggled with subtraction", "severity": "medium"}
+                ],
                 "summary": "Weak in math."
             })
-        elif "recommendation_agent" in agent.name:
+        elif "study_materials_agent" in agent.name:
+            return json.dumps({
+                "study_materials": [
+                    {"topic": "Arithmetic", "resources": [{"type": "textbook", "title": "Math 101", "description": "Basics", "difficulty": "beginner"}]}
+                ]
+            })
+        elif "practice_problems_agent" in agent.name:
+            return json.dumps({
+                "practice_problems": [
+                    {"topic": "Arithmetic", "problems": [{"difficulty": "easy", "problem": "2+2", "hint": "Add", "learning_goal": "Addition"}]}
+                ]
+            })
+        elif "learning_strategy_agent" in agent.name:
+            return json.dumps({
+                "learning_strategy": {
+                    "study_schedule": {"weekly_hours": 2, "sessions_per_week": 2, "session_duration": "30m"},
+                    "learning_techniques": [{"technique": "Flashcards", "when_to_use": "Daily", "expected_benefit": "Recall"}],
+                    "milestones": [{"timeline": "1 week", "goal": "Basics", "success_criteria": "80% correct"}]
+                }
+            })
+        elif "recommendation_synthesizer" in agent.name:
             return json.dumps({
                 "learning_objectives": [
                     {
-                        "topic": "Arithmetic",
                         "objective": "Learn addition",
-                        "resources": ["Math book"]
+                        "resources": ["Math 101"],
+                        "practice_activities": ["2+2"],
+                        "estimated_time": "1 week",
+                        "priority": "high"
                     }
                 ],
-                "encouragement": "Keep practicing!"
+                "weekly_plan": {
+                    "total_hours": 2,
+                    "activities": [{"day": "Mon", "activity": "Practice", "duration": "30m", "resources_needed": ["Math 101"]}]
+                },
+                "encouragement": "Keep practicing!",
+                "success_metrics": ["80% on quizzes"]
             })
         return "{}"
 
-    with patch('feedback_agent.utils.run_agent', side_effect=mock_run_agent):
-        # 1. Register Student
+    with patch("feedback_agent.agent.run_agent", side_effect=mock_run_agent, create=True):
+        from feedback_agent.agent import FeedbackSystem
+
+        system = FeedbackSystem(
+            db_path=str(db_path),
+            use_memory_sessions=True,
+            enable_metrics=False,
+            enable_logging_plugin=False,
+        )
+
         student_id = system.register_student("Alice")
         assert student_id is not None
 
-        # 2. Process Exam
-        exam_content = "..."
-        answer_key = "..."
-        
-        result = system.process_exam(student_id, "General Knowledge", exam_content, answer_key)
-        
-        # Verify Grading
-        assert result['grading']['total_score'] == 8
-        
-        # Verify Analysis
-        assert "Arithmetic" in result['analysis']['weaknesses']
-        
-        # Verify Recommendations
-        assert len(result['recommendations']['learning_objectives']) > 0
+        result = asyncio.run(
+            system.process_exam(student_id, "...", "...", "General Knowledge")
+        )
 
-        # Verify DB Persistence
+        assert result["total_score"] == 8
+        assert "Arithmetic" in result["weaknesses"][0]["topic"]
+        assert result["recommendations"]
+
         history = system.db.get_student_history(student_id)
         assert len(history) == 1
-        assert history[0]['subject'] == "General Knowledge"
+        assert history[0]["subject"] == "General Knowledge"

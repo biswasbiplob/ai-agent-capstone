@@ -34,58 +34,40 @@ from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
 from typing import AsyncGenerator
 
-# Load environment variables from .env file
-# Try specific path first, then fall back to current directory
-_env_path = Path(__file__).parent / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
-else:
-    load_dotenv()  # Load from current directory or system environment
-
 from feedback_agent.agents.analysis_agent import AnalysisAgent
 from feedback_agent.agents.grading_agent import GradingAgent
 from feedback_agent.agents.recommendation_agent import RecommendationAgent
 from feedback_agent.conversational_agent import create_root_agent
 from feedback_agent.database import StudentDatabase
+from feedback_agent.json_utils import parse_json_payload
 from feedback_agent.memory import MemoryService
 from feedback_agent.plugins import ExamMetricsPlugin
 
-# Configure structured logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Console output
-        logging.FileHandler("feedback_system.log", mode="a"),  # File output
-    ],
-)
 logger = logging.getLogger(__name__)
 
 
-def fix_json_string(json_str: str) -> str:
-    """
-    Fix common JSON formatting issues.
+def load_environment() -> None:
+    """Load environment variables from .env file if present."""
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
 
-    Handles:
-    - Trailing commas before closing braces/brackets
-    - Multiple consecutive commas
 
-    Args:
-        json_str: Potentially malformed JSON string
-
-    Returns:
-        Fixed JSON string
-    """
-    import re
-
-    # Remove trailing commas before closing braces/brackets
-    # Pattern: comma followed by optional whitespace and then } or ]
-    json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
-
-    # Remove multiple consecutive commas (rare but possible)
-    json_str = re.sub(r',\s*,', r',', json_str)
-
-    return json_str
+def configure_logging() -> None:
+    """Configure structured logging only if no handlers are present."""
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        return
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("feedback_system.log", mode="a"),
+        ],
+    )
 
 
 class ValidationAgent(BaseAgent):
@@ -222,6 +204,7 @@ class FeedbackSystem:
         enable_metrics: bool = True,
         metrics_file: str = "exam_metrics.jsonl",
         enable_logging_plugin: bool = True,
+        enable_logging_config: bool = True,
     ):
         """
         Initialize the feedback system.
@@ -233,7 +216,11 @@ class FeedbackSystem:
             enable_metrics: If True, enable ExamMetricsPlugin for observability
             metrics_file: Path to metrics file (JSONL format)
             enable_logging_plugin: If True, enable verbose LoggingPlugin output (disable for evaluations)
+            enable_logging_config: If True, configure logging handlers when needed
         """
+        load_environment()
+        if enable_logging_config:
+            configure_logging()
         self.db = StudentDatabase(db_path)
 
         # Initialize memory service for cross-session tracking
@@ -253,6 +240,8 @@ class FeedbackSystem:
 
         # Initialize plugins
         self.plugins = []
+        self.logging_plugin: Optional[LoggingPlugin] = None
+        self.metrics_plugin: Optional[ExamMetricsPlugin] = None
 
         # Add LoggingPlugin for ADK built-in observability (optional)
         if enable_logging_plugin:
@@ -260,7 +249,6 @@ class FeedbackSystem:
             self.plugins.append(self.logging_plugin)
             logger.info("📝 LoggingPlugin enabled for ADK observability")
         else:
-            self.logging_plugin = None
             logger.info("📝 LoggingPlugin disabled (evaluation mode)")
 
         # Add custom metrics plugin if enabled
@@ -270,8 +258,6 @@ class FeedbackSystem:
             )
             self.plugins.append(self.metrics_plugin)
             logger.info(f"📊 ExamMetricsPlugin enabled (logging to {metrics_file})")
-        else:
-            self.metrics_plugin = None
 
         # Create App with context compaction and plugins
         self.app = App(
@@ -320,7 +306,39 @@ class FeedbackSystem:
             }}
             '''
         )
-        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "study_materials": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "topic": types.Schema(type=types.Type.STRING),
+                            "resources": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(
+                                    type=types.Type.OBJECT,
+                                    properties={
+                                        "type": types.Schema(type=types.Type.STRING),
+                                        "title": types.Schema(type=types.Type.STRING),
+                                        "description": types.Schema(type=types.Type.STRING),
+                                        "difficulty": types.Schema(type=types.Type.STRING),
+                                    },
+                                    required=["type", "title", "description", "difficulty"],
+                                ),
+                            ),
+                        },
+                        required=["topic", "resources"],
+                    ),
+                ),
+            },
+            required=["study_materials"],
+        )
+        agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
         agent.output_key = "study_materials"
         return agent
 
@@ -356,7 +374,39 @@ class FeedbackSystem:
             }}
             '''
         )
-        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "practice_problems": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "topic": types.Schema(type=types.Type.STRING),
+                            "problems": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(
+                                    type=types.Type.OBJECT,
+                                    properties={
+                                        "difficulty": types.Schema(type=types.Type.STRING),
+                                        "problem": types.Schema(type=types.Type.STRING),
+                                        "hint": types.Schema(type=types.Type.STRING),
+                                        "learning_goal": types.Schema(type=types.Type.STRING),
+                                    },
+                                    required=["difficulty", "problem", "hint", "learning_goal"],
+                                ),
+                            ),
+                        },
+                        required=["topic", "problems"],
+                    ),
+                ),
+            },
+            required=["practice_problems"],
+        )
+        agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
         agent.output_key = "practice_problems"
         return agent
 
@@ -400,7 +450,55 @@ class FeedbackSystem:
             }}
             '''
         )
-        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "learning_strategy": types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "study_schedule": types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "weekly_hours": types.Schema(type=types.Type.NUMBER),
+                                "sessions_per_week": types.Schema(type=types.Type.NUMBER),
+                                "session_duration": types.Schema(type=types.Type.STRING),
+                            },
+                            required=["weekly_hours", "sessions_per_week", "session_duration"],
+                        ),
+                        "learning_techniques": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "technique": types.Schema(type=types.Type.STRING),
+                                    "when_to_use": types.Schema(type=types.Type.STRING),
+                                    "expected_benefit": types.Schema(type=types.Type.STRING),
+                                },
+                                required=["technique", "when_to_use", "expected_benefit"],
+                            ),
+                        ),
+                        "milestones": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "timeline": types.Schema(type=types.Type.STRING),
+                                    "goal": types.Schema(type=types.Type.STRING),
+                                    "success_criteria": types.Schema(type=types.Type.STRING),
+                                },
+                                required=["timeline", "goal", "success_criteria"],
+                            ),
+                        ),
+                    },
+                    required=["study_schedule", "learning_techniques", "milestones"],
+                ),
+            },
+            required=["learning_strategy"],
+        )
+        agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
         agent.output_key = "learning_strategy"
         return agent
 
@@ -448,7 +546,80 @@ class FeedbackSystem:
             }}
             '''
         )
-        agent.generate_content_config = types.GenerateContentConfig(response_mime_type='application/json')
+        response_schema = types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "learning_objectives": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "objective": types.Schema(type=types.Type.STRING),
+                            "resources": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(type=types.Type.STRING),
+                            ),
+                            "practice_activities": types.Schema(
+                                type=types.Type.ARRAY,
+                                items=types.Schema(type=types.Type.STRING),
+                            ),
+                            "estimated_time": types.Schema(type=types.Type.STRING),
+                            "priority": types.Schema(type=types.Type.STRING),
+                        },
+                        required=[
+                            "objective",
+                            "resources",
+                            "practice_activities",
+                            "estimated_time",
+                            "priority",
+                        ],
+                    ),
+                ),
+                "weekly_plan": types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "total_hours": types.Schema(type=types.Type.NUMBER),
+                        "activities": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "day": types.Schema(type=types.Type.STRING),
+                                    "activity": types.Schema(type=types.Type.STRING),
+                                    "duration": types.Schema(type=types.Type.STRING),
+                                    "resources_needed": types.Schema(
+                                        type=types.Type.ARRAY,
+                                        items=types.Schema(type=types.Type.STRING),
+                                    ),
+                                },
+                                required=[
+                                    "day",
+                                    "activity",
+                                    "duration",
+                                    "resources_needed",
+                                ],
+                            ),
+                        ),
+                    },
+                    required=["total_hours", "activities"],
+                ),
+                "encouragement": types.Schema(type=types.Type.STRING),
+                "success_metrics": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(type=types.Type.STRING),
+                ),
+            },
+            required=[
+                "learning_objectives",
+                "weekly_plan",
+                "encouragement",
+                "success_metrics",
+            ],
+        )
+        agent.generate_content_config = types.GenerateContentConfig(
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        )
         agent.output_key = "learning_plan"
         agent.after_agent_callback = self._log_recommendation_callback
         return agent
@@ -687,7 +858,10 @@ class FeedbackSystem:
                 return
 
             # Parse JSON result
-            grading_result = json.loads(grading_result_str)
+            grading_result = parse_json_payload(grading_result_str, "grading_result")
+            if not grading_result:
+                logger.error("Failed to parse grading_result JSON")
+                return
 
             # Get exam metadata from state
             exam_id = callback_context.state.get("exam_id")
@@ -728,7 +902,10 @@ class FeedbackSystem:
                 return
 
             # Parse JSON result
-            analysis_result = json.loads(analysis_result_str)
+            analysis_result = parse_json_payload(analysis_result_str, "weakness_analysis")
+            if not analysis_result:
+                logger.error("Failed to parse weakness_analysis JSON")
+                return
 
             # Get exam_id from state
             exam_id = callback_context.state.get("exam_id")
@@ -766,16 +943,13 @@ class FeedbackSystem:
                 logger.error("No learning_plan in state")
                 return
 
-            # Fix common JSON issues before parsing
-            fixed_json_str = fix_json_string(recommendation_result_str)
-
-            # Parse JSON result
-            try:
-                recommendation_result = json.loads(fixed_json_str)
-            except json.JSONDecodeError:
-                # If fixing didn't work, try original
-                logger.warning("JSON fixing failed, trying original string")
-                recommendation_result = json.loads(recommendation_result_str)
+            # Parse JSON result with cleanup
+            recommendation_result = parse_json_payload(
+                recommendation_result_str, "learning_plan"
+            )
+            if not recommendation_result:
+                logger.error("Failed to parse learning_plan JSON")
+                return
 
             # Get exam_id from state
             exam_id = callback_context.state.get("exam_id")
@@ -797,6 +971,12 @@ class FeedbackSystem:
 
     def register_student(self, name: str) -> str:
         """Register a new student and return their ID."""
+        existing = self.db.get_student_by_name(name)
+        if existing:
+            student_id = existing["student_id"]
+            logger.info(f"Student already registered: {name} ({student_id})")
+            return student_id
+
         student_id = str(uuid.uuid4())
         self.db.add_student(student_id, name)
         logger.info(f"Registered student: {name} ({student_id})")
@@ -1037,15 +1217,26 @@ def get_feedback_system() -> FeedbackSystem:
     return _feedback_system_instance
 
 
-# Create conversational wrapper for ADK web
-# This exposes a conversational interface that wraps the processing pipeline
+_root_agent: Optional[LlmAgent] = None
 
-# Get model from environment and pass to conversational agent
-model = os.getenv("MODEL_NAME")
-if not model:
-    raise ValueError(
-        "MODEL_NAME must be set in .env file. "
-        "Add MODEL_NAME=<model-name> to feedback_agent/.env "
-        "(e.g., MODEL_NAME=gemini-1.5-flash)"
-    )
-root_agent = create_root_agent(model=model)
+
+def get_root_agent() -> LlmAgent:
+    """Create or return the conversational root agent."""
+    global _root_agent
+    if _root_agent is None:
+        load_environment()
+        model = os.getenv("MODEL_NAME")
+        if not model:
+            raise ValueError(
+                "MODEL_NAME must be set in .env file. "
+                "Add MODEL_NAME=<model-name> to feedback_agent/.env "
+                "(e.g., MODEL_NAME=gemini-1.5-flash)"
+            )
+        _root_agent = create_root_agent(model=model)
+    return _root_agent
+
+
+def __getattr__(name: str):
+    if name == "root_agent":
+        return get_root_agent()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

@@ -7,7 +7,7 @@ intelligent recommendations based on historical data.
 """
 
 import json
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -76,14 +76,26 @@ class MemoryService:
         # Filter by date if lookback_days specified
         if lookback_days:
             cutoff_date = datetime.now() - timedelta(days=lookback_days)
-            # Note: history doesn't include dates, would need to fetch from exams table
-            # For now, process all available history
+            filtered_history = []
+            for exam in history:
+                exam_date = exam.get("date")
+                if not exam_date:
+                    continue
+                try:
+                    exam_dt = datetime.fromisoformat(exam_date)
+                except ValueError:
+                    continue
+                if exam_dt >= cutoff_date:
+                    filtered_history.append(exam)
+            history = filtered_history
 
         # Track weakness occurrences and metadata
-        weakness_tracker: Dict[str, List[Tuple[int, str]]] = defaultdict(list)
+        weakness_tracker: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
 
         for idx, exam in enumerate(history):
             weaknesses = exam.get('weaknesses', [])
+            exam_date = exam.get("date")
+            exam_id = exam.get("exam_id")
 
             for weakness in weaknesses:
                 # Extract topic from weakness dict or string
@@ -97,7 +109,12 @@ class MemoryService:
                     continue
 
                 if topic:
-                    weakness_tracker[topic].append((idx, severity))
+                    weakness_tracker[topic].append({
+                        "index": idx,
+                        "severity": severity,
+                        "date": exam_date,
+                        "exam_id": exam_id,
+                    })
 
         # Build WeaknessPattern objects for recurring weaknesses
         patterns = []
@@ -105,19 +122,28 @@ class MemoryService:
         for topic, occurrences in weakness_tracker.items():
             if len(occurrences) >= min_occurrences:
                 # Analyze severity trend
-                severities = [sev for _, sev in occurrences]
+                severities = [o["severity"] for o in occurrences]
                 severity_trend = self._analyze_severity_trend(severities)
 
                 # Get first and last occurrence indices
-                first_idx = min(occ[0] for occ in occurrences)
-                last_idx = max(occ[0] for occ in occurrences)
+                first_occurrence = min(occurrences, key=lambda o: o["index"])
+                last_occurrence = max(occurrences, key=lambda o: o["index"])
+
+                def _label(occ: Dict[str, Any]) -> str:
+                    date_value = occ.get("date")
+                    if date_value:
+                        return str(date_value)
+                    exam_id_value = occ.get("exam_id")
+                    if exam_id_value:
+                        return str(exam_id_value)
+                    return f"exam_{occ['index']}"
 
                 pattern = WeaknessPattern(
                     topic=topic,
                     occurrences=len(occurrences),
                     severity_trend=severity_trend,
-                    last_seen=f"exam_{last_idx}",
-                    first_seen=f"exam_{first_idx}"
+                    last_seen=_label(last_occurrence),
+                    first_seen=_label(first_occurrence),
                 )
                 patterns.append(pattern)
 

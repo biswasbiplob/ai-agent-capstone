@@ -5,6 +5,10 @@ This script validates that the new Runner-based implementation works correctly
 and follows ADK best practices.
 """
 
+import pytest
+
+pytest.importorskip("google.adk")
+
 import asyncio
 import logging
 import os
@@ -12,13 +16,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-env_path = Path(__file__).parent / "feedback_agent" / ".env"
+env_path = Path(__file__).resolve().parent.parent / "feedback_agent" / ".env"
 load_dotenv(env_path)
 
 # Verify API key is loaded
 if not os.getenv("GOOGLE_API_KEY"):
     print("⚠️  Warning: GOOGLE_API_KEY not found in environment!")
     print(f"   Tried loading from: {env_path}")
+    pytest.skip("GOOGLE_API_KEY not set", allow_module_level=True)
 else:
     print(f"✅ API Key loaded successfully")
 
