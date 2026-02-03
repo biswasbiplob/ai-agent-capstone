@@ -34,14 +34,6 @@ from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
 from typing import AsyncGenerator
 
-# Load environment variables from .env file
-# Try specific path first, then fall back to current directory
-_env_path = Path(__file__).parent / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
-else:
-    load_dotenv()  # Load from current directory or system environment
-
 from feedback_agent.agents.analysis_agent import AnalysisAgent
 from feedback_agent.agents.grading_agent import GradingAgent
 from feedback_agent.agents.recommendation_agent import RecommendationAgent
@@ -51,16 +43,31 @@ from feedback_agent.json_utils import parse_json_payload
 from feedback_agent.memory import MemoryService
 from feedback_agent.plugins import ExamMetricsPlugin
 
-# Configure structured logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Console output
-        logging.FileHandler("feedback_system.log", mode="a"),  # File output
-    ],
-)
 logger = logging.getLogger(__name__)
+
+
+def load_environment() -> None:
+    """Load environment variables from .env file if present."""
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
+
+
+def configure_logging() -> None:
+    """Configure structured logging only if no handlers are present."""
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        return
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("feedback_system.log", mode="a"),
+        ],
+    )
 
 
 class ValidationAgent(BaseAgent):
@@ -197,6 +204,7 @@ class FeedbackSystem:
         enable_metrics: bool = True,
         metrics_file: str = "exam_metrics.jsonl",
         enable_logging_plugin: bool = True,
+        enable_logging_config: bool = True,
     ):
         """
         Initialize the feedback system.
@@ -208,7 +216,11 @@ class FeedbackSystem:
             enable_metrics: If True, enable ExamMetricsPlugin for observability
             metrics_file: Path to metrics file (JSONL format)
             enable_logging_plugin: If True, enable verbose LoggingPlugin output (disable for evaluations)
+            enable_logging_config: If True, configure logging handlers when needed
         """
+        load_environment()
+        if enable_logging_config:
+            configure_logging()
         self.db = StudentDatabase(db_path)
 
         # Initialize memory service for cross-session tracking
@@ -1206,15 +1218,26 @@ def get_feedback_system() -> FeedbackSystem:
     return _feedback_system_instance
 
 
-# Create conversational wrapper for ADK web
-# This exposes a conversational interface that wraps the processing pipeline
+_root_agent: Optional[LlmAgent] = None
 
-# Get model from environment and pass to conversational agent
-model = os.getenv("MODEL_NAME")
-if not model:
-    raise ValueError(
-        "MODEL_NAME must be set in .env file. "
-        "Add MODEL_NAME=<model-name> to feedback_agent/.env "
-        "(e.g., MODEL_NAME=gemini-1.5-flash)"
-    )
-root_agent = create_root_agent(model=model)
+
+def get_root_agent() -> LlmAgent:
+    """Create or return the conversational root agent."""
+    global _root_agent
+    if _root_agent is None:
+        load_environment()
+        model = os.getenv("MODEL_NAME")
+        if not model:
+            raise ValueError(
+                "MODEL_NAME must be set in .env file. "
+                "Add MODEL_NAME=<model-name> to feedback_agent/.env "
+                "(e.g., MODEL_NAME=gemini-1.5-flash)"
+            )
+        _root_agent = create_root_agent(model=model)
+    return _root_agent
+
+
+def __getattr__(name: str):
+    if name == "root_agent":
+        return get_root_agent()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
