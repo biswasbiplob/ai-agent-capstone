@@ -718,16 +718,16 @@ def get_student_results(
                 "message": f"Student not found: {student_name or student_id}",
             }
 
-        student_id = student["student_id"]
-        student_name = student["name"]
-        exams = db.get_student_exams(student_id)
+        student_id_value: str = student["student_id"]
+        student_name_value: str = student["name"]
+        exams = db.get_student_exams(student_id_value)
 
         if not exams:
             return {
                 "status": "success",
-                "message": f"No exams recorded for {student_name}.",
-                "student_name": student_name,
-                "student_id": student_id,
+                "message": f"No exams recorded for {student_name_value}.",
+                "student_name": student_name_value,
+                "student_id": student_id_value,
                 "exams": [],
             }
 
@@ -749,8 +749,8 @@ def get_student_results(
 
         return {
             "status": "success",
-            "student_name": student_name,
-            "student_id": student_id,
+            "student_name": student_name_value,
+            "student_id": student_id_value,
             "summary": {
                 "total_exams": len(exams),
                 "average_percentage": round(avg_percentage, 1),
@@ -850,7 +850,7 @@ def get_class_analytics(tool_context: ToolContext) -> Dict[str, Any]:
         lowest = min(student_performances, key=lambda s: s["average_percentage"])
 
         # Find common weaknesses
-        weakness_counts = {}
+        weakness_counts: Dict[str, int] = {}
         for w in all_class_weaknesses:
             topic = w.get("topic", "Unknown")
             weakness_counts[topic] = weakness_counts.get(topic, 0) + 1
@@ -979,17 +979,24 @@ def get_learning_recommendations(
         db = system.db
 
         # Find student
-        if not student_id:
+        student_id_value: Optional[str] = student_id
+        if not student_id_value:
             student = db.get_student_by_name(student_name) if student_name else None
             if not student:
                 return {
                     "status": "error",
                     "message": f"Student not found: {student_name}",
                 }
-            student_id = student["student_id"]
+            student_id_value = student["student_id"]
+
+        if not student_id_value:
+            return {
+                "status": "error",
+                "message": "Student ID not available for recommendations.",
+            }
 
         # Get latest exam with recommendations
-        exams = db.get_student_exams(student_id)
+        exams = db.get_student_exams(student_id_value)
 
         if not exams:
             return {

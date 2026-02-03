@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import Agent
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from google.genai import types
 import json
 
@@ -16,7 +16,7 @@ load_dotenv()
 from feedback_agent.custom_llm import CustomGemini
 
 class AnalysisAgent:
-    def __init__(self, model: str = None):
+    def __init__(self, model: Optional[str] = None):
         # Get model from environment or use provided value
         if model is None:
             model = os.getenv('MODEL_NAME')
@@ -127,7 +127,7 @@ class AnalysisAgent:
     def analyze_performance(
         self,
         graded_exam: Dict[str, Any],
-        exam_content: str = None
+        exam_content: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Analyze a graded exam to identify student weaknesses.

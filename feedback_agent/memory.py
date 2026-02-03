@@ -129,11 +129,13 @@ class MemoryService:
                 first_occurrence = min(occurrences, key=lambda o: o["index"])
                 last_occurrence = max(occurrences, key=lambda o: o["index"])
 
-                def _label(occ: Dict[str, Optional[str]]) -> str:
-                    if occ.get("date"):
-                        return occ["date"]
-                    if occ.get("exam_id"):
-                        return occ["exam_id"]
+                def _label(occ: Dict[str, Any]) -> str:
+                    date_value = occ.get("date")
+                    if date_value:
+                        return str(date_value)
+                    exam_id_value = occ.get("exam_id")
+                    if exam_id_value:
+                        return str(exam_id_value)
                     return f"exam_{occ['index']}"
 
                 pattern = WeaknessPattern(

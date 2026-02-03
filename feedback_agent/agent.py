@@ -240,6 +240,8 @@ class FeedbackSystem:
 
         # Initialize plugins
         self.plugins = []
+        self.logging_plugin: Optional[LoggingPlugin] = None
+        self.metrics_plugin: Optional[ExamMetricsPlugin] = None
 
         # Add LoggingPlugin for ADK built-in observability (optional)
         if enable_logging_plugin:
@@ -247,7 +249,6 @@ class FeedbackSystem:
             self.plugins.append(self.logging_plugin)
             logger.info("📝 LoggingPlugin enabled for ADK observability")
         else:
-            self.logging_plugin = None
             logger.info("📝 LoggingPlugin disabled (evaluation mode)")
 
         # Add custom metrics plugin if enabled
@@ -257,8 +258,6 @@ class FeedbackSystem:
             )
             self.plugins.append(self.metrics_plugin)
             logger.info(f"📊 ExamMetricsPlugin enabled (logging to {metrics_file})")
-        else:
-            self.metrics_plugin = None
 
         # Create App with context compaction and plugins
         self.app = App(

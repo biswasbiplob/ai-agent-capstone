@@ -115,9 +115,10 @@ def get_my_performance(tool_context: ToolContext) -> Dict[str, Any]:
     all_weaknesses = []
     for exam in exams:
         exam_id = exam.get("exam_id")
-        analysis = _db.get_analysis(exam_id)
-        if analysis and analysis.get("weaknesses"):
-            all_weaknesses.extend(analysis["weaknesses"])
+        if exam_id:
+            analysis = _db.get_analysis(exam_id)
+            if analysis and analysis.get("weaknesses"):
+                all_weaknesses.extend(analysis["weaknesses"])
 
     return {
         "status": "success",
@@ -215,12 +216,13 @@ def get_student_performance(
     all_recommendations = []
     for exam in exams:
         exam_id = exam.get("exam_id")
-        analysis = _db.get_analysis(exam_id)
-        if analysis:
-            if analysis.get("weaknesses"):
-                all_weaknesses.extend(analysis["weaknesses"])
-            if analysis.get("recommendations"):
-                all_recommendations.append(analysis["recommendations"])
+        if exam_id:
+            analysis = _db.get_analysis(exam_id)
+            if analysis:
+                if analysis.get("weaknesses"):
+                    all_weaknesses.extend(analysis["weaknesses"])
+                if analysis.get("recommendations"):
+                    all_recommendations.append(analysis["recommendations"])
 
     return {
         "status": "success",
@@ -312,9 +314,10 @@ def get_class_statistics(tool_context: ToolContext) -> Dict[str, Any]:
             # Collect weaknesses
             for exam in exams:
                 exam_id = exam.get("exam_id")
-                analysis = _db.get_analysis(exam_id)
-                if analysis and analysis.get("weaknesses"):
-                    all_class_weaknesses.extend(analysis["weaknesses"])
+                if exam_id:
+                    analysis = _db.get_analysis(exam_id)
+                    if analysis and analysis.get("weaknesses"):
+                        all_class_weaknesses.extend(analysis["weaknesses"])
 
     # Calculate class averages
     if student_performances:
@@ -327,7 +330,7 @@ def get_class_statistics(tool_context: ToolContext) -> Dict[str, Any]:
         lowest_performer = None
 
     # Find most common weaknesses
-    weakness_counts = {}
+    weakness_counts: Dict[str, int] = {}
     for weakness in all_class_weaknesses:
         topic = weakness.get("topic", "Unknown")
         weakness_counts[topic] = weakness_counts.get(topic, 0) + 1

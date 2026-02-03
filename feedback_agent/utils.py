@@ -31,12 +31,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def run_agent(agent: Agent, input_text: str, image_path: str = None, image_bytes: bytes = None, session_state: Dict[str, Any] = None) -> str:
+def run_agent(
+    agent: Agent,
+    input_text: str,
+    image_path: Optional[str] = None,
+    image_bytes: Optional[bytes] = None,
+    session_state: Optional[Dict[str, Any]] = None,
+) -> str:
     """
     Synchronous wrapper for running an agent.
     Handles creating a fresh event loop in a separate thread if needed.
     """
-    result_queue = queue.Queue()
+    result_queue: queue.Queue[object] = queue.Queue()
 
     def target():
         try:
@@ -56,9 +62,17 @@ def run_agent(agent: Agent, input_text: str, image_path: str = None, image_bytes
     result = result_queue.get()
     if isinstance(result, Exception):
         raise result
+    if not isinstance(result, str):
+        raise TypeError(f"Expected string result, got {type(result)}")
     return result
 
-async def _run_agent_async(agent: Agent, prompt: str, image_path: str = None, image_bytes: bytes = None, session_state: Dict[str, Any] = None) -> str:
+async def _run_agent_async(
+    agent: Agent,
+    prompt: str,
+    image_path: Optional[str] = None,
+    image_bytes: Optional[bytes] = None,
+    session_state: Optional[Dict[str, Any]] = None,
+) -> str:
     # 1. Create Session
     session_id = str(uuid.uuid4())
     session = Session(id=session_id, app_name="feedback_agent", user_id="user")

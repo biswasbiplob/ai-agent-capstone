@@ -1,6 +1,6 @@
 
 from google.adk.agents.llm_agent import Agent
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from google.genai import types
 
 import logging
@@ -17,7 +17,7 @@ from feedback_agent.custom_llm import CustomGemini
 from feedback_agent.json_utils import parse_json_payload
 
 class GradingAgent:
-    def __init__(self, model: str = None):
+    def __init__(self, model: Optional[str] = None):
         # Get model from environment or use provided value
         if model is None:
             model = os.getenv('MODEL_NAME')

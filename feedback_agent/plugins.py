@@ -52,7 +52,7 @@ class ExamMetricsPlugin(BasePlugin):
         # Aggregated statistics
         self.total_exams_processed = 0
         self.total_processing_time = 0.0
-        self.score_distribution = []
+        self.score_distribution: list[float] = []
         self.success_count = 0
         self.failure_count = 0
 
