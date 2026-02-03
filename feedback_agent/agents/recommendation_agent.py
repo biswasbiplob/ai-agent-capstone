@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 from feedback_agent.custom_llm import CustomGemini
+from feedback_agent.json_utils import parse_json_payload
 
 class RecommendationAgent:
     def __init__(self, model: str = None):
@@ -95,14 +96,10 @@ class RecommendationAgent:
         response_text = run_agent(self.agent, prompt + "\n\nProvide the output as a valid JSON string.")
         
         try:
-            text = response_text
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            if start != -1 and end != -1:
-                json_str = text[start:end]
-                return json.loads(json_str)
-            else:
-                raise ValueError("No JSON found in response")
+            parsed = parse_json_payload(response_text, "recommendations")
+            if parsed:
+                return parsed
+            raise ValueError("No JSON found in response")
         except Exception as e:
             logger.error(f"Error parsing recommendation response: {e}")
             return {

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 from feedback_agent.custom_llm import CustomGemini
+from feedback_agent.json_utils import parse_json_payload
 
 class GradingAgent:
     def __init__(self, model: str = None):
@@ -124,16 +125,11 @@ class GradingAgent:
         
         logger.debug(f"GradingAgent raw response: {response_text[:200]}...")
         
-        # Simple cleanup to ensure we get the JSON part if there's extra text
         try:
-            import json
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-            if start != -1 and end != -1:
-                json_str = response_text[start:end]
-                return json.loads(json_str)
-            else:
-                raise ValueError("No JSON found in response")
+            parsed = parse_json_payload(response_text, "grading_result")
+            if parsed:
+                return parsed
+            raise ValueError("No JSON found in response")
         except Exception as e:
             logger.error(f"Error parsing grading response: {e}")
             logger.error(f"Raw response: {response_text}")
