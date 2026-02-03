@@ -48,3 +48,20 @@ def test_memory_service_recommendations(tmp_path):
     recommendations = memory.recommend_review_topics(student_id, max_topics=3)
     assert recommendations
     assert recommendations[0]["topic"] == "Revolutions"
+
+
+def test_mastery_progress_metrics(tmp_path):
+    db_path = tmp_path / "students.db"
+    db = StudentDatabase(str(db_path))
+    student_id = str(uuid.uuid4())
+    db.add_student(student_id, "Test Student")
+    memory = MemoryService(db)
+
+    _log_exam(db, student_id, "Math", 8, 10, [{"topic": "Algebra", "severity": "low"}])
+    _log_exam(db, student_id, "Math", 9, 10, [{"topic": "Algebra", "severity": "low"}])
+
+    mastery = memory.get_mastery_progress(student_id)
+    assert "Math" in mastery
+    metrics = mastery["Math"]
+    assert metrics["total_attempts"] == 2
+    assert 0 <= metrics["current_mastery"] <= 100

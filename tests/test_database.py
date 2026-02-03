@@ -3,6 +3,15 @@ import uuid
 from feedback_agent.database import StudentDatabase
 
 
+def test_add_student_idempotent(tmp_path):
+    db_path = tmp_path / "students.db"
+    db = StudentDatabase(str(db_path))
+    db.add_student("s1", "Alice")
+    db.add_student("s1", "Alice")
+    students = db.get_all_students()
+    assert len(students) == 1
+
+
 def test_student_lookup_and_history_order(tmp_path):
     db_path = tmp_path / "students.db"
     db = StudentDatabase(str(db_path))

@@ -100,7 +100,14 @@ class StudentDatabase:
                 current_weaknesses, current_topics, current_recommendations = row
                 new_weaknesses = json.dumps(weaknesses) if weaknesses is not None else current_weaknesses
                 new_topics = json.dumps(topics) if topics is not None else current_topics
-                new_recommendations = recommendations if recommendations is not None else current_recommendations
+                if recommendations is not None:
+                    new_recommendations = (
+                        json.dumps(recommendations)
+                        if not isinstance(recommendations, str)
+                        else recommendations
+                    )
+                else:
+                    new_recommendations = current_recommendations
 
                 cursor.execute('''
                     UPDATE analysis
@@ -108,6 +115,8 @@ class StudentDatabase:
                     WHERE exam_id = ?
                 ''', (new_weaknesses, new_topics, new_recommendations, exam_id))
             else:
+                if recommendations is not None and not isinstance(recommendations, str):
+                    recommendations = json.dumps(recommendations)
                 cursor.execute('''
                     INSERT INTO analysis (exam_id, weaknesses, topics, recommendations)
                     VALUES (?, ?, ?, ?)
@@ -223,7 +232,7 @@ class StudentDatabase:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT weaknesses, recommendations
+            SELECT weaknesses, topics, recommendations
             FROM analysis
             WHERE exam_id = ?
         ''', (exam_id,))
@@ -233,6 +242,7 @@ class StudentDatabase:
         if row:
             return {
                 'weaknesses': json.loads(row['weaknesses']) if row['weaknesses'] else [],
-                'recommendations': row['recommendations']
+                'topics': json.loads(row['topics']) if row['topics'] else [],
+                'recommendations': row['recommendations'],
             }
         return None
